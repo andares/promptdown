@@ -70,3 +70,5 @@ src/
 - 数组元素一行一个，无逗号分隔
 - 测试用 node:test + fixtures（`test/fixtures/*.pd`），新增语法规则必须补 fixtures + 断言
 - 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/SKILL.md` → fixtures
+- **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
+- 发布前必须跑 `npm run typecheck && npm test`，全部通过才可 `npm run release`
