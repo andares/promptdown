@@ -22,6 +22,7 @@
 | `pnpm typecheck` | `tsc --noEmit` 类型检查 |
 | `pnpm test` | node:test 跑 `test/*.test.ts`（tsx 执行） |
 | `pnpm build` | tsc 编译到 `dist/` |
+| `node dist/format-cli.js <file> [-w]` | 格式化 pd 文本（发布后为 `pdformat` 命令） |
 | `pnpm exec vsce package` | 生成 .vsix（或 `pnpm package`） |
 | `pnpm release <patch\|minor\|major>` | 一键发布：校验 → 测试 → bump → commit+tag → publish → vsce package |
 
@@ -77,6 +78,7 @@ src/
 - 数组元素一行一个，无逗号分隔
 - 测试用 node:test + fixtures（`test/fixtures/*.pd`），新增语法规则必须补 fixtures + 断言
 - 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/SKILL.md` → fixtures
+- 格式化规则（src/format.ts）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
 - **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
 - 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release`
 - `.npmignore` 控制发布内容（pnpm 复用 npm 的发布文件机制，勿删）；新增发布文件记得检查它

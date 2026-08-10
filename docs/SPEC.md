@@ -193,8 +193,22 @@ name3:
 
 ```
 pd2json <file.pd> [段名]
+pdformat <file.pd> [-w|--write]
 ```
 
 - 单段文件可省略段名
 - 多段文件必须指定段名（否则不知道转哪个）
 - 引用（`:refname`）在编译期内联展开
+
+## 7. 格式化（pdformat / VSCode 格式化程序）
+
+格式化规则（`src/format.ts` 与 VSCode `DocumentFormattingEditProvider` 共用同一实现）：
+
+1. **全角冒号 → 半角**：键值位置（`name1：some` → `name1: some`）与引用位置（` ：a1 ` → ` :a1 `）
+2. **键值冒号后恰好一个空格**：`key:value` → `key: value`；`key:  value` → `key: value`；无值保持 `key:`
+3. **引用前后各一个空格**：` :refname `（行首/行尾边界除外）
+4. **顶层 `-` 缩进自动修正**：去缩进（与编译工具的报错规则一致，仅格式化时修正）
+5. **行尾空白清理**
+
+识别边界：半角冒号按 lexer 语义（键名可含空格，`name1 : some` 也是键值）；
+全角冒号需紧贴键名才算键值（`no ：a1` 是内容行 + 引用，不视为键值）。

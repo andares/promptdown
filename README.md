@@ -24,6 +24,7 @@
 | 📦 **可转 JSON** | `pd2json` CLI 单向转换，输出稳定、可机读 |
 | 🔗 **嵌套引用** | `:refname` 编译期内联展开，多段 `//!pd <name>` 混排复用 |
 | 🎨 **VSCode 高亮** | TextMate grammar 纯声明式扩展，**无需 LSP**，零红线 |
+| ✨ **自动格式化** | CLI `pdformat` + VSCode 格式化程序，全角冒号/引用空格/顶层缩进一键规范 |
 | 🤖 **AI 友好** | 内置 skill：看到 `//!pd` 即按 pd 格式解析 |
 | 📝 **兼容 Markdown** | 内联 `**粗体**`、`` `代码` `` 等保留原文，混输无压力 |
 
@@ -120,6 +121,20 @@ pd2json <file.pd> [段名]
 - 引用在编译期内联展开，支持嵌套与循环检测
 - 语法错误（如顶层 `-` 缩进）会带行号报错退出
 
+### ✨ 格式化
+
+```bash
+pdformat <file.pd> [-w|--write]   # 默认输出 stdout；-w 写回原文件
+```
+
+格式化规则：
+
+- 全角冒号 `：` → 半角 `:`（键值/引用位置）
+- 键值冒号后恰好一个空格（`key: value`）
+- 引用 ` :refname ` 前后各一个空格
+- 顶层 `-` 缩进自动修正
+- 行尾空白清理
+
 ## 🎨 VSCode 扩展
 
 安装 `.vsix` 后，`.pd` 文件自动获得高亮：
@@ -130,11 +145,21 @@ pd2json <file.pd> [段名]
 - 🔗 引用 `:refname`
 - 📋 `-` 序列项
 
-纯声明式扩展（无 extension.ts、无 LSP），不会产生任何诊断红线。
+纯声明式扩展（无 LSP），不会产生任何诊断红线。
 
 ```bash
 code --install-extension prompt-down-<version>.vsix
 ```
+
+### ✨ 格式化程序（已注册）
+
+扩展内置文档格式化程序（`DocumentFormattingEditProvider`）：
+
+- 按默认格式化热键 **`Shift+Alt+F`**（或你自定义的 keybinding）即可格式化当前 `.pd` 文件
+- 也可右键 → **Format Document**
+- 想保存时自动格式化：设置 `"editor.formatOnSave": true`（或仅对 pd：`"[promptdown]": { "editor.formatOnSave": true }`）
+
+格式化规则与 `pdformat` CLI 一致（全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白）。
 
 ### 📁 文件图标
 
