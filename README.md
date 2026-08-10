@@ -8,7 +8,7 @@
 就能写出结构清晰、AI 友好、可直接转 JSON 的文本。
 
 [![npm version](https://img.shields.io/npm/v/@andares/promptdown?color=4fc08d&label=npm)](https://www.npmjs.com/package/@andares/promptdown)
-[![license](https://img.shields.io/npm/l/prompt-down?color=orange)](./LICENSE)
+[![license](https://img.shields.io/npm/l/@andares/promptdown?color=orange)](./LICENSE)
 [![vscode](https://img.shields.io/badge/VSCode-Extension-007acc?logo=visualstudiocode&logoColor=white)](https://github.com/andares/prompt-down)
 [![AI skill](https://img.shields.io/badge/AI-Skill-8b5cf6)](./skill/SKILL.md)
 
