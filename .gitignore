@@ -4,3 +4,6 @@ dist/
 *.tgz
 npm-debug.log*
 .DS_Store
+tmp/
+
+tmp/

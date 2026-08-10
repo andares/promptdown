@@ -4,6 +4,8 @@ src/
 test/
 skill/
 docs/
+scripts/
+tmp/
 tsconfig.json
 .git/
 .vscode/

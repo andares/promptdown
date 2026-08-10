@@ -51,9 +51,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -w -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "package": "vsce package",
-    "prepublishOnly": "npm run build"
+    "release": "node ./scripts/publish.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
