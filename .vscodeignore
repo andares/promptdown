@@ -1,0 +1,15 @@
+node_modules/
+dist/
+src/
+test/
+skill/
+docs/
+tsconfig.json
+.git/
+.vscode/
+**/*.ts
+*.vsix
+*.tgz
+PLAN.md
+.npmignore
+.gitignore

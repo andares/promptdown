@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "prompt-down",
+  "scopeName": "source.pd",
+  "patterns": [
+    { "include": "#section" },
+    { "include": "#separator" },
+    { "include": "#ref" },
+    { "include": "#key" },
+    { "include": "#info" },
+    { "include": "#item" }
+  ],
+  "repository": {
+    "section": {
+      "comment": "//!pd <name> 段标记",
+      "match": "^\\s*(//!pd)(\\s+[A-Za-z0-9_-]+)?.*$",
+      "captures": {
+        "1": { "name": "keyword.control.pd" },
+        "2": { "name": "entity.name.section.pd" }
+      }
+    },
+    "separator": {
+      "comment": "--- 分隔线",
+      "match": "^\\s*(---)\\s*$",
+      "captures": {
+        "1": { "name": "punctuation.separator.pd" }
+      }
+    },
+    "ref": {
+      "comment": ":refname 引用（前后带空格）",
+      "match": "(?:^|\\s)(:[A-Za-z0-9_-]+)(?=\\s|$)",
+      "captures": {
+        "1": { "name": "markup.quote.pd" }
+      }
+    },
+    "key": {
+      "comment": "键值：key: / - key:（冒号前无空格）",
+      "match": "^(\\s*)(-\\s+)?([^\\s:][^:]*)(:)(?=\\s|$)",
+      "captures": {
+        "2": { "name": "punctuation.definition.list.pd" },
+        "3": { "name": "entity.name.tag.pd" },
+        "4": { "name": "punctuation.definition.key-value.pd" }
+      }
+    },
+    "info": {
+      "comment": "Info 默认键（Info1/Info2...）",
+      "match": "^(\\s*)(-\\s+)?(Info\\d+)(:)(?=\\s|$)",
+      "captures": {
+        "2": { "name": "punctuation.definition.list.pd" },
+        "3": { "name": "support.constant.pd" },
+        "4": { "name": "punctuation.definition.key-value.pd" }
+      }
+    },
+    "item": {
+      "comment": "- 序列项",
+      "match": "^(\\s*)(-\\s+)(.*)$",
+      "captures": {
+        "2": { "name": "punctuation.definition.list.pd" },
+        "3": { "name": "string.unquoted.pd" }
+      }
+    }
+  }
+}

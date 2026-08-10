@@ -1,0 +1,11 @@
+node_modules/
+src/
+test/
+syntaxes/
+*.vsix
+*.tgz
+.git/
+PLAN.md
+tsconfig.json
+.vscodeignore
+.npmignore

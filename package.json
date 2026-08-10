@@ -1,0 +1,64 @@
+{
+  "name": "prompt-down",
+  "displayName": "prompt-down",
+  "description": "极简标记语言 prompt-down（.pd）：兼容 markdown 风格，可转 JSON，提供 VSCode 语法高亮与 pd2json CLI",
+  "version": "0.1.0",
+  "publisher": "andares",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andares/prompt-down.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters"
+  ],
+  "keywords": [
+    "markdown",
+    "prompt",
+    "markup",
+    "json",
+    "language"
+  ],
+  "bin": {
+    "pd2json": "./dist/cli.js"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "promptdown",
+        "aliases": [
+          "prompt-down",
+          "PromptDown"
+        ],
+        "extensions": [
+          ".pd"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "promptdown",
+        "scopeName": "source.pd",
+        "path": "./syntaxes/pd.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -w -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts",
+    "package": "vsce package",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@vscode/vsce": "^3.9.2",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3"
+  }
+}
