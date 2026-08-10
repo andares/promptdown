@@ -46,6 +46,13 @@
         "scopeName": "source.pd",
         "path": "./syntaxes/pd.tmLanguage.json"
       }
+    ],
+    "iconThemes": [
+      {
+        "id": "promptdown-icons",
+        "label": "prompt-down Icons",
+        "path": "./theme/pd-icon-theme.json"
+      }
     ]
   },
   "scripts": {

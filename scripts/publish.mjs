@@ -151,7 +151,9 @@ run(git, ["tag", `v${next}`]);
 
 // 4. Publish npm (prepublishOnly re-gates with typecheck + test + build).
 step("npm publish");
-const publish = run(npm, ["publish", "--no-git-checks"], { allowFailure: true });
+const publish = run(npm, ["publish", "--no-git-checks"], {
+	allowFailure: true,
+});
 if (publish.status !== 0) {
 	console.error(
 		`${C.red}Publish failed. The version bump is already committed + tagged as v${next}.` +

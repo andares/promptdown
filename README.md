@@ -136,6 +136,16 @@ pd2json <file.pd> [段名]
 code --install-extension prompt-down-<version>.vsix
 ```
 
+### 📁 文件图标
+
+扩展附带图标主题 **prompt-down Icons**（继承 Seti，只替换 `.pd` 图标）：
+
+- `Ctrl+Shift+P` → **File Icon Theme** → 选 `prompt-down Icons`
+- 或 settings.json 里设 `"workbench.iconTheme": "promptdown-icons"`
+
+> 注：VSCode 不允许扩展强制覆盖用户的图标主题，需要在设置里手动切换一次。
+> 因为继承了 Seti，其他文件图标保持不变，只有 `.pd` 显示专属图标。
+
 ## 🤖 AI Skill
 
 [`skill/SKILL.md`](skill/SKILL.md) 为 AI 工具提供 pd 语法知识：

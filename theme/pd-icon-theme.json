@@ -1,0 +1,11 @@
+{
+  "extends": "vs-seti",
+  "iconDefinitions": {
+    "_pd": {
+      "iconPath": "./icons/pd.svg"
+    }
+  },
+  "fileExtensions": {
+    "pd": "_pd"
+  }
+}
