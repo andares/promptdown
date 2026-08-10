@@ -151,7 +151,9 @@ run(git, ["tag", `v${next}`]);
 
 // 4. Publish pnpm (prepublishOnly re-gates with typecheck + test + build).
 step("pnpm publish");
-const publish = run(pnpm, ["publish", "--no-git-checks"], { allowFailure: true });
+const publish = run(pnpm, ["publish", "--no-git-checks"], {
+	allowFailure: true,
+});
 if (publish.status !== 0) {
 	console.error(
 		`${C.red}Publish failed. The version bump is already committed + tagged as v${next}.` +
