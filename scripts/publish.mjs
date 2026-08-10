@@ -114,7 +114,9 @@ if (dryRun) {
 	console.log(
 		`  3. git commit -m "chore: release v${next}" && git tag v${next}`,
 	);
-	console.log(`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`);
+	console.log(
+		`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`,
+	);
 	console.log(`  5. pnpm exec vsce package → prompt-down-${next}.vsix`);
 	console.log(
 		process.env.VSCODE_MARKETPLACE_TOKEN
