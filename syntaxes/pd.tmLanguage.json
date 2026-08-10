@@ -12,10 +12,10 @@
   ],
   "repository": {
     "section": {
-      "comment": "//!pd <name> 段标记",
+      "comment": "//!pd <name> 段标记（markup.heading：主题标题色 + 粗体，与 key 区分）",
       "match": "^\\s*(//!pd)(\\s+[A-Za-z0-9_-]+)?.*$",
       "captures": {
-        "1": { "name": "keyword.control.pd" },
+        "1": { "name": "markup.heading.pd" },
         "2": { "name": "entity.name.section.pd" }
       }
     },
