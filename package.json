@@ -2,7 +2,7 @@
   "name": "prompt-down",
   "displayName": "prompt-down",
   "description": "极简标记语言 prompt-down（.pd）：兼容 markdown 风格，可转 JSON，提供 VSCode 语法高亮与 pd2json CLI",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "publisher": "andares",
   "license": "MIT",
   "repository": {
