@@ -11,3 +11,5 @@ PLAN.md
 tsconfig.json
 .vscodeignore
 .npmignore
+pnpm-lock.yaml
+pnpm-workspace.yaml

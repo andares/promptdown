@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+  '@vscode/vsce-sign': true
+  keytar: false
+minimumReleaseAgeExclude:
+  - tsx@4.23.12

@@ -62,7 +62,7 @@
     "test": "tsx --test test/*.test.ts",
     "package": "vsce package",
     "release": "node ./scripts/publish.mjs",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

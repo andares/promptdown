@@ -212,7 +212,7 @@ prompt-down/
 
 ## 实施步骤
 
-- [ ] 1. npm init + tsconfig（strict）+ .gitignore + .vscodeignore
+- [ ] 1. pnpm init + tsconfig（strict）+ .gitignore + .vscodeignore
 - [ ] 2. 写 docs/SPEC.md（语法规范，含全部用户范例）
 - [ ] 3. 实现 parser：types.ts → lexer.ts（行分类）→ parser.ts（块栈/缩进找爸爸/Subject/顶层-缩进忽略）→ toJson.ts（单条折叠）
 - [ ] 4. 实现 expand.ts（引用内联展开，段名定位）
@@ -221,13 +221,13 @@ prompt-down/
 - [ ] 7. 写 syntaxes/pd.tmLanguage.json（高亮：段标记/分隔线/键值/`-` 项/引用/Info 键）
 - [ ] 8. language-configuration.json + package.json contributes 注册 .pd 语言
 - [ ] 9. 写 skill/SKILL.md（//!pd 触发词 + 语法速查 + 引用 SPEC.md）
-- [ ] 10. 打包 .vsix（vsce）+ npm 发布准备
+- [ ] 10. 打包 .vsix（vsce）+ pnpm 发布准备
 - [ ] 11. 初始提交
 
 ## 验证
 
 - `pd2json test/fixtures/flat.pd <段名>` 输出与范例 1 JSON 一致；anon.pd 与范例 2 一致；subject.pd 与范例 3 一致；ref.pd 与范例 4 一致
-- `npm test` 通过（node:test）
+- `pnpm test` 通过（node:test）
 - VSCode 打开 .pd 文件：高亮正常、无红线（无 LSP 无拼写干扰）
 - pi 中提问含 `//!pd` 时加载 skill 正确解析
 

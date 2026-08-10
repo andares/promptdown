@@ -30,7 +30,7 @@
 ## 🚀 快速开始
 
 ```bash
-npm install -g prompt-down
+pnpm add -g prompt-down
 pd2json your-prompt.pd
 ```
 
@@ -158,21 +158,21 @@ code --install-extension prompt-down-<version>.vsix
 ## 🛠️ 开发
 
 ```bash
-npm install
-npm run typecheck   # 类型检查
-npm test            # node:test（12+ 用例覆盖全部语法规则）
-npm run build       # tsc → dist/
-npm run package     # 打包 .vsix
+pnpm install
+pnpm typecheck   # 类型检查
+pnpm test        # node:test（12+ 用例覆盖全部语法规则）
+pnpm build       # tsc → dist/
+pnpm package     # 打包 .vsix
 ```
 
 ### 发布
 
 ```bash
-npm run release patch   # 0.1.0 → 0.1.1（也可用 minor / major）
-npm run release patch -- --dry-run   # 先预览计划
+pnpm release patch   # 0.1.0 → 0.1.1（也可用 minor / major）
+pnpm release patch -- --dry-run   # 先预览计划
 ```
 
-一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `npm publish` → `vsce package`。
+一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `vsce package`。
 设置 `VSCODE_MARKETPLACE_TOKEN` 后还会自动上传扩展市场。
 
 ## 📁 项目结构
