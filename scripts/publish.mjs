@@ -31,6 +31,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PKG_PATH = join(ROOT, "package.json");
 const BUMPS = ["major", "minor", "patch"];
 
+// npm registry 相似度保护拒绝 `prompt-down`（与已存在的 promptdown 太像），
+// 发布 npm 时临时用 scoped 名；仓库/VSIX 保持非 scoped（vsce 要求）。
+const NPM_NAME = "@andares/promptdown";
+const VSCE_NAME = "prompt-down";
+
 const C = {
 	reset: "\x1b[0m",
 	dim: "\x1b[2m",
@@ -109,7 +114,7 @@ if (dryRun) {
 	console.log(
 		`  3. git commit -m "chore: release v${next}" && git tag v${next}`,
 	);
-	console.log(`  4. pnpm publish --no-git-checks`);
+	console.log(`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`);
 	console.log(`  5. pnpm exec vsce package → prompt-down-${next}.vsix`);
 	console.log(
 		process.env.VSCODE_MARKETPLACE_TOKEN
@@ -150,10 +155,19 @@ run(git, ["commit", "-m", `chore: release v${next}`]);
 run(git, ["tag", `v${next}`]);
 
 // 4. Publish pnpm (prepublishOnly re-gates with typecheck + test + build).
-step("pnpm publish");
-const publish = run(pnpm, ["publish", "--no-git-checks"], {
-	allowFailure: true,
-});
+// 临时切换 scoped 包名发布（npm registry 拒绝 prompt-down），随后恢复供 vsce 打包。
+step(`pnpm publish（scoped: ${NPM_NAME}）`);
+pkg.name = NPM_NAME;
+writeFileSync(PKG_PATH, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
+let publish;
+try {
+	publish = run(pnpm, ["publish", "--no-git-checks", "--access=public"], {
+		allowFailure: true,
+	});
+} finally {
+	pkg.name = VSCE_NAME;
+	writeFileSync(PKG_PATH, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
+}
 if (publish.status !== 0) {
 	console.error(
 		`${C.red}Publish failed. The version bump is already committed + tagged as v${next}.` +

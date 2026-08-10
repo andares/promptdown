@@ -7,7 +7,7 @@
 为提示词（prompt）组织而生的 `.pd` 格式 —— 只用一个 `:` 和一个 `-`，
 就能写出结构清晰、AI 友好、可直接转 JSON 的文本。
 
-[![npm version](https://img.shields.io/npm/v/prompt-down?color=4fc08d&label=npm)](https://www.npmjs.com/package/prompt-down)
+[![npm version](https://img.shields.io/npm/v/@andares/promptdown?color=4fc08d&label=npm)](https://www.npmjs.com/package/@andares/promptdown)
 [![license](https://img.shields.io/npm/l/prompt-down?color=orange)](./LICENSE)
 [![vscode](https://img.shields.io/badge/VSCode-Extension-007acc?logo=visualstudiocode&logoColor=white)](https://github.com/andares/prompt-down)
 [![AI skill](https://img.shields.io/badge/AI-Skill-8b5cf6)](./skill/SKILL.md)
@@ -30,7 +30,7 @@
 ## 🚀 快速开始
 
 ```bash
-pnpm add -g prompt-down
+pnpm add -g @andares/promptdown
 pd2json your-prompt.pd
 ```
 

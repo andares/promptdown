@@ -61,9 +61,13 @@ src/
 3. 门禁：typecheck + test + build，失败即中止
 4. bump `package.json` version（2 空格缩进 + 尾换行）
 5. `git commit -m "chore: release vX.Y.Z"` + `git tag vX.Y.Z`
-6. `pnpm publish --no-git-checks`（prepublishOnly 再次门禁 typecheck+test+build）
+6. `pnpm publish --no-git-checks --access=public`（prepublishOnly 再次门禁 typecheck+test+build）
 7. `pnpm exec vsce package` 生成 `prompt-down-<version>.vsix`
 8. 若设了 `VSCODE_MARKETPLACE_TOKEN`，自动 `vsce publish`；否则手动上传 .vsix
+
+**npm 包名与仓库名不同**：npm registry 相似度保护拒绝 `prompt-down`（与已存在的 `promptdown` 太像），
+所以发布 npm 时脚本临时切换为 scoped 名 **`@andares/promptdown`**（`--access=public`），发布后恢复为
+`prompt-down`（vsce 需要非 scoped 名，扩展 ID 为 `andares.prompt-down`）。安装命令：`pnpm add -g @andares/promptdown`。
 
 发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`
 
