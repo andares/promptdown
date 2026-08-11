@@ -108,6 +108,7 @@ pd2json your-prompt.pd
 | ⏳ **空行无视** | 没有 `---` 时空多少行都继续找爸爸 |
 
 > 📚 完整语法规范见 [`docs/SPEC.md`](docs/SPEC.md)（唯一事实来源）
+> 🍳 新手教程见 [`docs/TUTORIAL.md`](docs/TUTORIAL.md)（从纯文本到引用/代码块，喂饭式示例，复制即跑）
 
 ## 🔗 引用示例（多段混排）
 
