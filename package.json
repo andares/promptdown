@@ -1,7 +1,7 @@
 {
-  "name": "prompt-down",
-  "displayName": "prompt-down",
-  "description": "极简标记语言 prompt-down（.pd）：兼容 markdown 风格，可转 JSON，提供 VSCode 语法高亮与 pd2json CLI",
+  "name": "promptdown",
+  "displayName": "promptdown",
+  "description": "极简标记语言 promptdown（.pd）：兼容 markdown 风格，可转 JSON，提供 VSCode 语法高亮与 pd2json CLI",
   "version": "0.1.1",
   "publisher": "andares",
   "license": "MIT",
@@ -11,7 +11,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/andares/prompt-down.git"
+    "url": "https://github.com/andares/promptdown.git"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -36,8 +36,8 @@
       {
         "id": "promptdown",
         "aliases": [
-          "prompt-down",
-          "PromptDown"
+          "promptdown",
+          "Promptdown"
         ],
         "extensions": [
           ".pd"
@@ -55,7 +55,7 @@
     "iconThemes": [
       {
         "id": "promptdown-icons",
-        "label": "prompt-down Icons",
+        "label": "promptdown Icons",
         "path": "./theme/pd-icon-theme.json"
       }
     ]

@@ -1,6 +1,6 @@
-# prompt-down Project Guidelines
+# promptdown Project Guidelines
 
-极简标记语言 prompt-down（.pd）：兼容 markdown 风格，可单向转 JSON。
+极简标记语言 promptdown（.pd）：兼容 markdown 风格，可单向转 JSON。
 提供 `pd2json` CLI、VSCode 语法高亮（TextMate grammar，无 LSP）与 AI skill。
 
 ## Package Management
@@ -63,12 +63,12 @@ src/
 4. bump `package.json` version（2 空格缩进 + 尾换行）
 5. `git commit -m "chore: release vX.Y.Z"` + `git tag vX.Y.Z`
 6. `pnpm publish --no-git-checks --access=public`（prepublishOnly 再次门禁 typecheck+test+build）
-7. `pnpm exec vsce package` 生成 `prompt-down-<version>.vsix`
+7. `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`
 8. 若设了 `VSCODE_MARKETPLACE_TOKEN`，自动 `vsce publish`；否则手动上传 .vsix
 
-**npm 包名与仓库名不同**：npm registry 相似度保护拒绝 `prompt-down`（与已存在的 `promptdown` 太像），
-所以发布 npm 时脚本临时切换为 scoped 名 **`@andares/promptdown`**（`--access=public`），发布后恢复为
-`prompt-down`（vsce 需要非 scoped 名，扩展 ID 为 `andares.prompt-down`）。安装命令：`pnpm add -g @andares/promptdown`。
+**npm 包名与仓库名不同**：npm registry 上 `promptdown` 已被他人占用（相似度保护会拒绝近似名），
+所以发布 npm 时脚本切换为 scoped 名 **`@andares/promptdown`**（`--access=public`），发布后恢复为
+`promptdown`（vsce 需要非 scoped 名，扩展 ID 为 `andares.promptdown`）。安装命令：`pnpm add -g @andares/promptdown`。
 
 发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`
 

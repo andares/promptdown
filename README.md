@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📄 prompt-down
+# 📄 promptdown
 
 **极简标记语言 · 兼容 Markdown 风格 · 一键转 JSON**
 
@@ -9,7 +9,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@andares/promptdown?color=4fc08d&label=npm)](https://www.npmjs.com/package/@andares/promptdown)
 [![license](https://img.shields.io/npm/l/@andares/promptdown?color=orange)](./LICENSE)
-[![vscode](https://img.shields.io/badge/VSCode-Extension-007acc?logo=visualstudiocode&logoColor=white)](https://github.com/andares/prompt-down)
+[![vscode](https://img.shields.io/badge/VSCode-Extension-007acc?logo=visualstudiocode&logoColor=white)](https://github.com/andares/promptdown)
 [![AI skill](https://img.shields.io/badge/AI-Skill-8b5cf6)](./skill/SKILL.md)
 
 </div>
@@ -148,7 +148,7 @@ pdformat <file.pd> [-w|--write]   # 默认输出 stdout；-w 写回原文件
 纯声明式扩展（无 LSP），不会产生任何诊断红线。
 
 ```bash
-code --install-extension prompt-down-<version>.vsix
+code --install-extension promptdown-<version>.vsix
 ```
 
 ### ✨ 格式化程序（已注册）
@@ -163,9 +163,9 @@ code --install-extension prompt-down-<version>.vsix
 
 ### 📁 文件图标
 
-扩展附带图标主题 **prompt-down Icons**（继承 Seti，只替换 `.pd` 图标）：
+扩展附带图标主题 **promptdown Icons**（继承 Seti，只替换 `.pd` 图标）：
 
-- `Ctrl+Shift+P` → **File Icon Theme** → 选 `prompt-down Icons`
+- `Ctrl+Shift+P` → **File Icon Theme** → 选 `promptdown Icons`
 - 或 settings.json 里设 `"workbench.iconTheme": "promptdown-icons"`
 
 > 注：VSCode 不允许扩展强制覆盖用户的图标主题，需要在设置里手动切换一次。
@@ -203,7 +203,7 @@ pnpm release patch -- --dry-run   # 先预览计划
 ## 📁 项目结构
 
 ```
-prompt-down/
+promptdown/
 ├── src/parser/          # 语法引擎（lexer → parser → toJson → expand）
 ├── src/cli.ts           # pd2json CLI
 ├── syntaxes/            # TextMate 语法高亮

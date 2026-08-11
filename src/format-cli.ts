@@ -4,7 +4,7 @@ import { format } from "./format";
 
 const USAGE = `用法: pdformat <file.pd> [-w|--write]
 
-格式化 prompt-down 文本：
+格式化 promptdown 文本：
 - 全角冒号 → 半角（键值/引用位置）
 - 键值冒号后恰好一个空格（key: value）
 - 引用 :refname 前后各一个空格

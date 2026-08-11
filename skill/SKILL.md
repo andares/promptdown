@@ -1,15 +1,15 @@
 ---
-name: prompt-down
+name: promptdown
 description: >-
-  prompt-down（pd）极简标记语言解析。当用户输入中出现 //!pd 标记时，
+  promptdown（pd）极简标记语言解析。当用户输入中出现 //!pd 标记时，
   其后的内容全部按 pd 格式解析；也用于处理 .pd 文件、pd 语法高亮与转 JSON。
-  触发词：//!pd、prompt-down、.pd 文件、pd 格式、pd2json。
+  触发词：//!pd、promptdown、.pd 文件、pd 格式、pd2json。
   核心语法：key: value 键值（单条折叠为字符串）、无 key 内容归 Info 数组、
   顶层匿名根 Subject、带 - 序列按缩进嵌套、--- 分隔线、:refname 引用内联展开、
   //!pd <name> 段标记。
 ---
 
-# prompt-down 语法速查
+# promptdown 语法速查
 
 极简标记语言：兼容 markdown 风格，可单向转 JSON。**完整规范见 `../docs/SPEC.md`（唯一事实来源），本文件与 SPEC 冲突时以 SPEC 为准。**
 

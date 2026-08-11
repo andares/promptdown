@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { format } from "./format";
 
 /**
- * prompt-down 扩展入口：注册文档格式化程序。
+ * promptdown 扩展入口：注册文档格式化程序。
  * 触发方式：默认格式化热键（Shift+Alt+F）、右键 Format Document、
  * 或用户自定义的 keybinding；配合 editor.formatOnSave 可保存时格式化。
  */

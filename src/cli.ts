@@ -7,7 +7,7 @@ import { toJson } from "./parser/toJson";
 
 const USAGE = `用法: pd2json <file.pd> [段名]
 
-转 prompt-down 为 JSON。
+转 promptdown 为 JSON。
 - 单段文件可省略段名
 - 多段文件必须指定段名（//!pd <name>）
 - 引用 (:refname) 在编译期内联展开`;

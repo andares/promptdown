@@ -1,8 +1,8 @@
-# prompt-down 项目初始化规划
+# promptdown 项目初始化规划
 
 ## Context
 
-设计极简标记语言 **prompt-down（.pd）**：
+设计极简标记语言 **promptdown（.pd）**：
 
 - 极简，兼容 markdown 风格（不追求完全规范）
 - 支持转 JSON（单向，不做反转）
@@ -10,7 +10,7 @@
 - 转 JSON 的 CLI 工具（`pd2json`，支持嵌套引用内联展开）
 - pi skill 便于 AI 理解语法（skill/ 独立目录）
 - 技术栈：TypeScript 单包（VSCode 扩展 + CLI 合一个 package.json）
-- 仓库已建：`/home/andares/repos/andares/prompt-down`（git 已初始化，MIT，remote 已配）
+- 仓库已建：`/home/andares/repos/andares/promptdown`（git 已初始化，MIT，remote 已配）
 
 ## 语法设计（用户确认版）
 
@@ -168,7 +168,7 @@ name3:
 ## 目录结构（定稿）
 
 ```
-prompt-down/
+promptdown/
 ├── package.json                  # VSCode 扩展 manifest + bin: pd2json + 类型/入口
 ├── tsconfig.json
 ├── .vscodeignore                 # vsce 打包排除

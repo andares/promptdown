@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-command release for prompt-down（pnpm 包 + VSCode 扩展）。
+ * One-command release for promptdown（pnpm 包 + VSCode 扩展）。
  *
  *   pnpm release patch   # 0.1.0 → 0.1.1
  *   pnpm release minor   # 0.1.0 → 0.2.0   (patch zeroed)
@@ -31,10 +31,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PKG_PATH = join(ROOT, "package.json");
 const BUMPS = ["major", "minor", "patch"];
 
-// npm registry 相似度保护拒绝 `prompt-down`（与已存在的 promptdown 太像），
-// 发布 npm 时临时用 scoped 名；仓库/VSIX 保持非 scoped（vsce 要求）。
+// npm registry 上 `promptdown` 已被他人占用（相似度保护会拒绝近似名），
+// 发布 npm 时用 scoped 名；仓库/VSCE 用非 scoped（vsce 要求）。
 const NPM_NAME = "@andares/promptdown";
-const VSCE_NAME = "prompt-down";
+const VSCE_NAME = "promptdown";
 
 const C = {
 	reset: "\x1b[0m",
@@ -117,7 +117,7 @@ if (dryRun) {
 	console.log(
 		`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`,
 	);
-	console.log(`  5. pnpm exec vsce package → prompt-down-${next}.vsix`);
+	console.log(`  5. pnpm exec vsce package → promptdown-${next}.vsix`);
 	console.log(
 		process.env.VSCODE_MARKETPLACE_TOKEN
 			? `  6. pnpm exec vsce publish（检测到 VSCODE_MARKETPLACE_TOKEN）`
@@ -157,7 +157,7 @@ run(git, ["commit", "-m", `chore: release v${next}`]);
 run(git, ["tag", `v${next}`]);
 
 // 4. Publish pnpm (prepublishOnly re-gates with typecheck + test + build).
-// 临时切换 scoped 包名发布（npm registry 拒绝 prompt-down），随后恢复供 vsce 打包。
+// 临时切换 scoped 包名发布（npm 的 promptdown 已被占用），随后恢复供 vsce 打包。
 step(`pnpm publish（scoped: ${NPM_NAME}）`);
 pkg.name = NPM_NAME;
 writeFileSync(PKG_PATH, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
@@ -187,7 +187,7 @@ if (vsce.status !== 0) {
 			`\n  可手动运行: pnpm exec vsce package${C.reset}`,
 	);
 } else {
-	console.log(`${C.dim}vsix: ${ROOT}/prompt-down-${next}.vsix${C.reset}`);
+	console.log(`${C.dim}vsix: ${ROOT}/promptdown-${next}.vsix${C.reset}`);
 }
 
 // 6. Optional: publish to the VSCode Marketplace.

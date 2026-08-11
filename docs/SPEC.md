@@ -1,10 +1,10 @@
-# prompt-down 语法规范（SPEC）
+# promptdown 语法规范（SPEC）
 
-> 本文档是 prompt-down 语法的**唯一事实来源**。VSCode grammar、parser、skill 均以本文档为准。
+> 本文档是 promptdown 语法的**唯一事实来源**。VSCode grammar、parser、skill 均以本文档为准。
 
 ## 1. 概述
 
-prompt-down（.pd）是一种极简标记语言：
+promptdown（.pd）是一种极简标记语言：
 
 - 兼容 markdown 风格（不追求完全规范）
 - 支持单向转 JSON（不支持反转）
