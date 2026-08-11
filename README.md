@@ -198,7 +198,7 @@ pnpm release patch -- --dry-run   # 先预览计划
 ```
 
 一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `vsce package`。
-设置 `VSCODE_MARKETPLACE_TOKEN` 后还会自动上传扩展市场。
+设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后还会自动上传扩展市场。
 
 ## 📁 项目结构
 

@@ -12,7 +12,7 @@
  *   validate arg → warn on dirty git tree (non-blocking) → typecheck + test
  *   + build → bump package.json → git commit `chore: release vX.Y.Z` +
  *   tag `vX.Y.Z` → `pnpm publish`（prepublishOnly 再门禁）→ `pnpm exec vsce
- *   package` 生成 .vsix。若设置了 VSCODE_MARKETPLACE_TOKEN，则继续
+ *   package` 生成 .vsix。若设置了 VSCE_PAT（vsce 官方环境变量），则继续
  *   `pnpm exec vsce publish` 上传扩展市场。
  *
  * `--dry-run` 只打印计划（版本 + 步骤），不修改任何东西。
@@ -119,9 +119,9 @@ if (dryRun) {
 	);
 	console.log(`  5. pnpm exec vsce package → promptdown-${next}.vsix`);
 	console.log(
-		process.env.VSCODE_MARKETPLACE_TOKEN
-			? `  6. pnpm exec vsce publish（检测到 VSCODE_MARKETPLACE_TOKEN）`
-			: `  6. pnpm exec vsce publish（跳过：未设置 VSCODE_MARKETPLACE_TOKEN）`,
+		process.env.VSCE_PAT
+			? `  6. pnpm exec vsce publish（检测到 VSCE_PAT）`
+			: `  6. pnpm exec vsce publish（跳过：未设置 VSCE_PAT）`,
 	);
 	process.exit(0);
 }
@@ -191,7 +191,7 @@ if (vsce.status !== 0) {
 }
 
 // 6. Optional: publish to the VSCode Marketplace.
-if (process.env.VSCODE_MARKETPLACE_TOKEN) {
+if (process.env.VSCE_PAT) {
 	step("pnpm exec vsce publish");
 	const vp = run(
 		pnpm,

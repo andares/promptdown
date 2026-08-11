@@ -64,7 +64,7 @@ src/
 5. `git commit -m "chore: release vX.Y.Z"` + `git tag vX.Y.Z`
 6. `pnpm publish --no-git-checks --access=public`（prepublishOnly 再次门禁 typecheck+test+build）
 7. `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`
-8. 若设了 `VSCODE_MARKETPLACE_TOKEN`，自动 `vsce publish`；否则手动上传 .vsix
+8. 若设了 `VSCE_PAT`（vsce 官方环境变量），自动 `vsce publish`；否则手动上传 .vsix
 
 **npm 包名与仓库名不同**：npm registry 上 `promptdown` 已被他人占用（相似度保护会拒绝近似名），
 所以发布 npm 时脚本切换为 scoped 名 **`@andares/promptdown`**（`--access=public`），发布后恢复为
