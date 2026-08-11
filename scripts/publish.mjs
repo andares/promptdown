@@ -195,7 +195,7 @@ if (process.env.VSCE_PAT) {
 	step("pnpm exec vsce publish");
 	const vp = run(
 		pnpm,
-		["exec", "vsce", "publish", "--no-git-checks", "--skip-duplicate"],
+		["exec", "vsce", "publish", "--skip-duplicate"],
 		{ allowFailure: true },
 	);
 	if (vp.status !== 0) {
