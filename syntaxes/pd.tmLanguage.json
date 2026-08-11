@@ -3,6 +3,7 @@
   "name": "promptdown",
   "scopeName": "source.pd",
   "patterns": [
+    { "include": "#code-block" },
     { "include": "#section" },
     { "include": "#separator" },
     { "include": "#literal-colon" },
@@ -12,6 +13,19 @@
     { "include": "#item" }
   ],
   "repository": {
+    "code-block": {
+      "comment": "``` 围栏代码块：转 JSON 为 Code 对象（lang 可空，body 为整个文本）",
+      "begin": "^(\\s*)(```)([A-Za-z0-9_+-]*)?.*$",
+      "end": "^\\s*```\\s*$",
+      "beginCaptures": {
+        "2": { "name": "punctuation.definition.fenced.pd" },
+        "3": { "name": "entity.name.tag.pd" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.fenced.pd" }
+      },
+      "name": "markup.fenced_code.block.pd"
+    },
     "section": {
       "comment": "//!pd <name> 段标记（markup.heading：主题标题色 + 粗体，与 key 区分）",
       "match": "^\\s*(//!pd)(\\s+[A-Za-z0-9_-]+)?.*$",

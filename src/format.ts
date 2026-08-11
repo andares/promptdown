@@ -82,9 +82,23 @@ function formatLine(raw: string): string {
  * 3. 后续全角冒号仅在左侧有空格时转半角；后续半角冒号不处理
  * 4. 顶层 `- ` 缩进自动修正（去缩进；编译工具报错的同一规则）
  * 5. 行尾空白清理
+ * 6. ``` 围栏内行原样保留（不参与任何格式化，保护代码）
  */
 export function format(text: string): string {
-	let out = text.split(/\r?\n/).map(formatLine);
+	const rawLines = text.split(/\r?\n/);
+	let inFence = false;
+	let out = rawLines.map((l) => {
+		const trimmed = l.trimStart();
+		if (inFence) {
+			if (trimmed.startsWith("```")) inFence = false;
+			return l; // 围栏内原样
+		}
+		if (trimmed.startsWith("```")) {
+			inFence = true;
+			return l.replace(/[ \t]+$/, ""); // 围栏行本身清行尾
+		}
+		return formatLine(l);
+	});
 
 	// 顶层 `- ` 缩进修正：反复解析直到无该错误（上限 5 轮）
 	for (let round = 0; round < 5; round++) {

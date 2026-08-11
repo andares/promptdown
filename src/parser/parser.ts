@@ -21,6 +21,14 @@ function pushInfo(b: Block, item: string): void {
 	(b.infos[b.curInfo] as string[]).push(item);
 }
 
+/** 压入代码块（``` 围栏）：body 为整个代码文本（含换行）；代码块打断 Info 连续段 */
+function pushCode(b: Block, lang: string, bodyLines: string[]): void {
+	const index = b.codes.length;
+	b.codes.push({ lang, body: bodyLines.join("\n") });
+	b.order.push({ kind: "code", index });
+	b.lastWasKey = true;
+}
+
 /**
  * 按缩进找爸爸：栈中最近一个 baseIndent < indent 的块；
  * 同时把基准 ≥ indent 的块弹出（闭块）。
@@ -54,7 +62,46 @@ export function parse(lines: PLine[]): PdDoc {
 		} satisfies PError);
 	};
 
+	// 围栏状态：``` 开围栏，``` 闭合；围栏内行原样收集（不参与行解析）
+	let inFence = false;
+	let fenceLang = "";
+	let fenceBody: string[] = [];
+
+	/**
+	 * 代码块归属（简化规则）：只能属于顶层——
+	 * 栈中第一个非 root 块（顶层键块或 Subject）；栈只有 root 时先建 Subject。
+	 */
+	const ensureCodeTarget = (): Block => {
+		const top = stack[1];
+		if (top) return top;
+		if (!curSubject || root.lastWasKey) {
+			curSubject = newBlock(`Subject${++subjectSeq}`, NEG_INF, root);
+			root.entries.set(curSubject.name, curSubject);
+			root.order.push({ kind: "key", name: curSubject.name });
+			root.lastWasKey = false;
+			stack.length = 1;
+			stack.push(curSubject);
+		}
+		return curSubject as Block;
+	};
+
 	for (const line of lines) {
+		if (inFence) {
+			if (/^```/.test(line.text)) {
+				pushCode(ensureCodeTarget(), fenceLang, fenceBody);
+				inFence = false;
+			} else {
+				fenceBody.push(line.raw);
+			}
+			continue;
+		}
+		if (/^```/.test(line.text)) {
+			inFence = true;
+			fenceLang = line.text.slice(3).trim();
+			fenceBody = [];
+			continue;
+		}
+
 		switch (line.kind) {
 			case "blank":
 			case "section":
@@ -150,6 +197,11 @@ export function parse(lines: PLine[]): PdDoc {
 			default:
 				break;
 		}
+	}
+
+	// 文件尾未闭合围栏：body 延伸到文件尾（宽容处理）
+	if (inFence) {
+		pushCode(ensureCodeTarget(), fenceLang, fenceBody);
 	}
 
 	return doc;
