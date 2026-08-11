@@ -17,9 +17,7 @@ export function blockToJson(b: Block): JsonValue {
 			const child = b.entries.get(entry.name);
 			if (child) obj[entry.name] = blockToJson(child);
 		} else {
-			obj[`Info${entry.index + 1}`] = (
-				b.infos[entry.index] as string[]
-			).slice();
+			obj[`Info${entry.index + 1}`] = [...(b.infos[entry.index] as string[])];
 		}
 	}
 	return obj;

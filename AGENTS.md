@@ -28,7 +28,7 @@
 
 ## Architecture
 
-```
+```text
 src/
 ├── cli.ts            # pd2json 入口（读文件 → expand → parse → toJson → 打印）
 └── parser/

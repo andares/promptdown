@@ -28,7 +28,6 @@ function main(): void {
 	} catch (e) {
 		console.error(`pd2json: 无法读取文件 ${file}: ${(e as Error).message}`);
 		process.exit(1);
-		return;
 	}
 
 	try {
@@ -40,7 +39,6 @@ function main(): void {
 				console.error(`           ${err.raw}`);
 			}
 			process.exit(1);
-			return;
 		}
 		console.log(JSON.stringify(toJson(doc), null, 2));
 	} catch (e) {

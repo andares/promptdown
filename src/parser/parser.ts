@@ -146,6 +146,9 @@ export function parse(lines: PLine[]): PdDoc {
 				stack.length = len;
 				break;
 			}
+
+			default:
+				break;
 		}
 	}
 

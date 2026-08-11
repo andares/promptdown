@@ -29,7 +29,6 @@ function main(): void {
 	} catch (e) {
 		console.error(`pdformat: 无法读取文件 ${file}: ${(e as Error).message}`);
 		process.exit(1);
-		return;
 	}
 
 	const formatted = format(text);
