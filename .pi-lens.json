@@ -1,0 +1,6 @@
+{
+  "rules": {
+    "high-complexity": { "threshold": 25 },
+    "high-fan-out": { "threshold": 25 }
+  }
+}
