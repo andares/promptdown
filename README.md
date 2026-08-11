@@ -47,27 +47,35 @@ pnpm add -g @andares/promptdown
 pd2json your-prompt.pd
 ```
 
-写一个 `.pd` 文件：
+写一个 `.pd` 文件——比如给影视 AI 描述一段分镜：
 
 ```pd
-name1:
-- some
-- name2: other words
-- name3:
-  - more
-  - words
-words
+分镜:
+- 镜头1:
+  - 场景: 雨夜小巷
+  - 运镜: 低角度跟拍
+  - 时长: 5秒
+- 镜头2:
+  - 场景: 天台
+  - 运镜: 无人机环绕
+  - 时长: 8秒
 ```
 
 转出来的 JSON：
 
 ```json
 {
-  "name1": {
-    "Info1": ["some"],
-    "name2": "other words",
-    "name3": { "Info1": ["more", "words"] },
-    "Info2": ["words"]
+  "分镜": {
+    "镜头1": {
+      "场景": "雨夜小巷",
+      "运镜": "低角度跟拍",
+      "时长": "5秒"
+    },
+    "镜头2": {
+      "场景": "天台",
+      "运镜": "无人机环绕",
+      "时长": "8秒"
+    }
   }
 }
 ```
@@ -103,25 +111,33 @@ words
 
 ## 🔗 引用示例（多段混排）
 
-```pd
-//!pd base
-name1:
-- some: words
+以编程任务为例：`任务` 段引用 `基础设定` 段（引用名支持中文），编译期自动内联展开——
 
-//!pd main
-name3: no :base more
+```pd
+//!pd 基础设定
+- 语言: TypeScript
+- 目标: 实现一个带防抖的搜索框
+
+//!pd 任务
+任务:
+- 技术栈: React
+- 参考: :基础设定
+- 额外要求: 防抖延迟 300ms
 ```
 
 ```bash
-pd2json file.pd main
+pd2json file.pd 任务
 ```
 
 ```json
 {
-  "name3": {
-    "Info1": ["no"],
-    "name1": { "some": "words" },
-    "Info2": ["more"]
+  "任务": {
+    "技术栈": "React",
+    "参考": {
+      "语言": "TypeScript",
+      "目标": "实现一个带防抖的搜索框"
+    },
+    "额外要求": "防抖延迟 300ms"
   }
 }
 ```

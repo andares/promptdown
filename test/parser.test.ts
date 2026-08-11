@@ -143,6 +143,36 @@ msg: say :base please`;
 	});
 });
 
+test("中文引用名：块嵌入展开（fixture ref-cn）", () => {
+	assert.deepEqual(fromFile("ref-cn.pd", "任务"), {
+		任务: {
+			技术栈: "React",
+			参考: { 语言: "TypeScript", 目标: "实现一个带防抖的搜索框" },
+			额外要求: "防抖延迟 300ms",
+		},
+	});
+});
+
+test("中文引用名：纯文字引用 → 内联嵌入（保留前后空格）", () => {
+	const text = `//!pd 设定
+快走，别回头
+//!pd 台词
+台词: 她说 :设定 了吗`;
+	assert.deepEqual(fromText(text, "台词"), {
+		台词: "她说 快走，别回头 了吗",
+	});
+});
+
+test("中文引用名：`:-` 普通冒号标记仍不被识别为引用，后续中文引用正常展开", () => {
+	const text = `//!pd 设定
+hello world
+//!pd 台词
+clock:- 12:30 :设定 done`;
+	assert.deepEqual(fromText(text, "台词"), {
+		Subject1: { Info1: ["clock:- 12:30 hello world done"] },
+	});
+});
+
 test("空块 → 空对象", () => {
 	assert.deepEqual(fromText("name:"), { name: {} });
 });

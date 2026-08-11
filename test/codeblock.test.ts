@@ -25,10 +25,9 @@ test("代码块：无 lang → 只有 body 字段", () => {
 });
 
 test("代码块：多行 body 保留换行（整个代码文本）", () => {
-	assert.deepEqual(
-		pd2json("name:\n```py\ndef f():\n    return 1\n```"),
-		{ name: { Code1: { lang: "py", body: "def f():\n    return 1" } } },
-	);
+	assert.deepEqual(pd2json("name:\n```py\ndef f():\n    return 1\n```"), {
+		name: { Code1: { lang: "py", body: "def f():\n    return 1" } },
+	});
 });
 
 test("代码块：顶层无 key → 归 Subject1", () => {
@@ -38,28 +37,22 @@ test("代码块：顶层无 key → 归 Subject1", () => {
 });
 
 test("代码块：嵌套 `- sub:` 内出现 → 仍归顶层键（简化规则）", () => {
-	assert.deepEqual(
-		pd2json("name:\n- sub:\n  - x\n```js\nconst a = 1;\n```"),
-		{
-			name: {
-				sub: { Info1: ["x"] },
-				Code1: { lang: "js", body: "const a = 1;" },
-			},
+	assert.deepEqual(pd2json("name:\n- sub:\n  - x\n```js\nconst a = 1;\n```"), {
+		name: {
+			sub: { Info1: ["x"] },
+			Code1: { lang: "js", body: "const a = 1;" },
 		},
-	);
+	});
 });
 
 test("代码块：与 Info 混排保持顺序", () => {
-	assert.deepEqual(
-		pd2json("name:\n- some\n```\ncode\n```\nwords"),
-		{
-			name: {
-				Info1: ["some"],
-				Code1: { body: "code" },
-				Info2: ["words"],
-			},
+	assert.deepEqual(pd2json("name:\n- some\n```\ncode\n```\nwords"), {
+		name: {
+			Info1: ["some"],
+			Code1: { body: "code" },
+			Info2: ["words"],
 		},
-	);
+	});
 });
 
 test("代码块：有代码块时键值不折叠", () => {
@@ -69,10 +62,9 @@ test("代码块：有代码块时键值不折叠", () => {
 });
 
 test("代码块：多个代码块编号递增 Code1/Code2", () => {
-	assert.deepEqual(
-		pd2json("name:\n```a\n1\n```\n```b\n2\n```"),
-		{ name: { Code1: { lang: "a", body: "1" }, Code2: { lang: "b", body: "2" } } },
-	);
+	assert.deepEqual(pd2json("name:\n```a\n1\n```\n```b\n2\n```"), {
+		name: { Code1: { lang: "a", body: "1" }, Code2: { lang: "b", body: "2" } },
+	});
 });
 
 test("代码块：未闭合围栏 → body 延伸到文件尾", () => {
@@ -82,13 +74,10 @@ test("代码块：未闭合围栏 → body 延伸到文件尾", () => {
 });
 
 test("代码块：每层独立编号（name.Code1 与 Subject1.Code1）", () => {
-	assert.deepEqual(
-		pd2json("name:\n```\na\n```\n---\n```\nb\n```"),
-		{
-			name: { Code1: { body: "a" } },
-			Subject1: { Code1: { body: "b" } },
-		},
-	);
+	assert.deepEqual(pd2json("name:\n```\na\n```\n---\n```\nb\n```"), {
+		name: { Code1: { body: "a" } },
+		Subject1: { Code1: { body: "b" } },
+	});
 });
 
 test("format：围栏内行原样保留（不格式化冒号/缩进）", () => {

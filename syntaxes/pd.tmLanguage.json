@@ -28,7 +28,7 @@
     },
     "section": {
       "comment": "//!pd <name> 段标记（markup.heading：主题标题色 + 粗体，与 key 区分）",
-      "match": "^\\s*(//!pd)(\\s+[A-Za-z0-9_-]+)?.*$",
+      "match": "^\\s*(//!pd)(\\s+[^\\s]+)?.*$",
       "captures": {
         "1": { "name": "markup.heading.pd" },
         "2": { "name": "entity.name.section.pd" }
@@ -43,7 +43,7 @@
     },
     "ref": {
       "comment": ":refname 引用（前后带空格；引用名不能以 - 开头）",
-      "match": "(?:^|\\s)(:[A-Za-z0-9_][A-Za-z0-9_-]*)(?=\\s|$)",
+      "match": "(?:^|\\s)(:[^\\s-][^\\s]*)(?=\\s|$)",
       "captures": {
         "1": { "name": "markup.quote.pd" }
       }

@@ -34,7 +34,8 @@ function normalizeLaterColons(s: string, startsAfterSpace = false): string {
 	let out = "";
 	for (let i = 0; i < s.length; i++) {
 		const char = s[i] as string;
-		const leftHasSpace = i === 0 ? startsAfterSpace : /\s/.test(s[i - 1] as string);
+		const leftHasSpace =
+			i === 0 ? startsAfterSpace : /\s/.test(s[i - 1] as string);
 		if (char === "：" && s[i + 1] !== "-" && leftHasSpace) out += ":";
 		else out += char;
 	}
