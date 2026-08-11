@@ -11,9 +11,9 @@
  * - release-all：同 release，但 npm 铁定发（失败即中止，版本已锚定）；
  *   npm 成功后尝试推 GitHub（分支 + tags，失败仅警告——可能此前已推过），
  *   并用 GITHUB_TOKEN 创建 GitHub Release v{next}（best-effort：未设 token /
- *   已存在 / 失败都只提示、不中止）；随后 vsce publish 必走——未设
- *   VSCE_PAT 或失败时降级：只提示、不中止，结果 = 仅 npm 已发布
- *   （可稍后手动补发扩展）。
+ *   已存在 / 失败都只提示、不中止）；随后 vsce publish 必走——vsce 凭据
+ *   （VSCE_PAT 环境变量或 `vsce login` 存的 ~/.vsce 文件）缺失或发布失败时
+ *   降级：只提示、不中止，结果 = 仅 npm 已发布（可稍后手动补发扩展）。
  *
  * `--dry-run` 只打印计划（版本 + 步骤），不修改任何东西。
  *
@@ -26,6 +26,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -135,6 +136,23 @@ function tagExists(tag) {
 	);
 }
 
+// vsce 认证可用性：VSCE_PAT 环境变量，或 `vsce login` 存的凭据文件
+// ~/.vsce（keytar 原生模块在本机未编译，vsce 降级为明文文件存储）。
+// 两者都没有时才需要拦截（避免 vsce 交互式等待输入 PAT 而挂起）。
+function vsceCredentialAvailable() {
+	if (process.env.VSCE_PAT) return true;
+	try {
+		const store = JSON.parse(readFileSync(join(homedir(), ".vsce"), "utf8"));
+		return (
+			store.publishers?.some((p) => p.name === pkg.publisher && p.pat) ?? false
+		);
+	} catch {
+		return false;
+	}
+}
+
+const vsceCred = vsceCredentialAvailable();
+
 const branch =
 	run(git, ["branch", "--show-current"], {
 		stdio: "pipe",
@@ -174,15 +192,15 @@ if (dryRun) {
 	);
 	if (mode === "all") {
 		console.log(
-			process.env.VSCE_PAT
-				? `  7. pnpm exec vsce publish（release-all 必走）`
-				: `  7. pnpm exec vsce publish（release-all 必走，但未设置 VSCE_PAT → 仅提示）`,
+			vsceCred
+				? `  7. pnpm exec vsce publish（release-all 必走，检测到凭据）`
+				: `  7. pnpm exec vsce publish（release-all 必走，但无 vsce 凭据 → 仅提示）`,
 		);
 	} else {
 		console.log(
-			process.env.VSCE_PAT
-				? `  7. pnpm exec vsce publish（检测到 VSCE_PAT）`
-				: `  7. pnpm exec vsce publish（跳过：未设置 VSCE_PAT）`,
+			vsceCred
+				? `  7. pnpm exec vsce publish（检测到凭据）`
+				: `  7. pnpm exec vsce publish（跳过：无 vsce 凭据）`,
 		);
 	}
 	process.exit(0);
@@ -287,18 +305,36 @@ if (!process.env.GITHUB_TOKEN) {
 	);
 	const lines = rel.stdout.toString().trimEnd().split("\n");
 	const code = lines.pop()?.trim() ?? "";
-	const body = lines.join("\n");
 	if (rel.status === 0 && code === "201") {
 		console.log(`${C.green}GitHub Release v${next} 创建成功${C.reset}`);
-	} else if (code === "422" && body.includes("already_exists")) {
-		console.warn(
-			`${C.yellow}GitHub Release v${next} 已存在，跳过（不重复创建）${C.reset}`,
-		);
 	} else {
-		console.warn(
-			`${C.yellow}GitHub Release 创建失败（HTTP ${code || "?"}）。` +
-				`npm 已发布 v${next}，可稍后手动创建。${C.reset}`,
+		// POST 失败后查询确认——release 可能已存在（并发/重试/手动补建），
+		// 幂等处理：查询返回 200 即视为成功，不再重复创建。
+		const chk = run(
+			curl,
+			[
+				"-sS",
+				"-o",
+				"/dev/null",
+				"-w",
+				"%{http_code}",
+				"-H",
+				`Authorization: Bearer ${process.env.GITHUB_TOKEN}`,
+				`https://api.github.com/repos/${ghRepo}/releases/tags/v${next}`,
+			],
+			{ allowFailure: true, stdio: "pipe" },
 		);
+		const chkCode = chk.stdout.toString().trim();
+		if (chkCode === "200") {
+			console.warn(
+				`${C.yellow}POST 返回 HTTP ${code || "?"}，但查询确认 Release v${next} 已存在，跳过（不重复创建）${C.reset}`,
+			);
+		} else {
+			console.warn(
+				`${C.yellow}GitHub Release 创建失败（POST HTTP ${code || "?"}，按 tag 查询 ${chkCode || "?"}）。` +
+					`npm 已发布 v${next}，可稍后手动创建。${C.reset}`,
+			);
+		}
 	}
 }
 
@@ -318,12 +354,12 @@ if (vsce.status !== 0) {
 
 // 7. Publish to the VSCode Marketplace.
 if (mode === "all") {
-	// release-all：必走。未配置 token 或失败都只提示，不中止（npm 已锚定）。
 	step("pnpm exec vsce publish");
-	if (!process.env.VSCE_PAT) {
+	if (!vsceCred) {
 		console.warn(
-			`${C.yellow}未设置 VSCE_PAT — 无法发布扩展。npm 已发布 v${next}，` +
-				`\n  稍后可手动: export VSCE_PAT=... && pnpm exec vsce publish${C.reset}`,
+			`${C.yellow}无 vsce 凭据（VSCE_PAT 未设置，~/.vsce 也没有 publisher 凭据）— 无法发布扩展。` +
+				`npm 已发布 v${next}，` +
+				`\n  稍后可手动: pnpm exec vsce login andares 或 export VSCE_PAT=... && pnpm exec vsce publish${C.reset}`,
 		);
 	} else {
 		const vp = run(
@@ -337,7 +373,7 @@ if (mode === "all") {
 			);
 		}
 	}
-} else if (process.env.VSCE_PAT) {
+} else if (vsceCred) {
 	step("pnpm exec vsce publish");
 	const vp = run(
 		pnpm,

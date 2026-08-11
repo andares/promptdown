@@ -6,6 +6,7 @@ pnpm-debug.log*
 *.log
 .DS_Store
 tmp/
+.firecrawl/
 
 # pi 工具运行产物（subagent 会话/临时文件）
 .pi-subagents/
