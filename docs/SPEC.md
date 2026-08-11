@@ -211,7 +211,7 @@ name3:
 
 ## 6. CLI
 
-```
+```text
 pd2json <file.pd> [段名]
 pdformat <file.pd> [-w|--write]
 ```
