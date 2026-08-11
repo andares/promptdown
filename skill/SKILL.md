@@ -13,6 +13,8 @@ description: >-
 
 极简标记语言：兼容 markdown 风格，可单向转 JSON。**完整规范见 `../docs/SPEC.md`（唯一事实来源），本文件与 SPEC 冲突时以 SPEC 为准。**
 
+> ✍️ 需要**写**提示词结构（而不是 markdown）？用作者版 skill：`pd-author/SKILL.md`（触发词：写提示词/组织提示词/结构化提示词）。
+
 ## 行类型
 
 | 行 | 语义 |

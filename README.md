@@ -207,12 +207,20 @@ code --install-extension promptdown-<version>.vsix
 
 ## 🤖 AI Skill
 
-[`skill/SKILL.md`](skill/SKILL.md) 为 AI 工具提供 pd 语法知识：
+两个 skill，按需安装：
+
+**① 解析版 [`skill/SKILL.md`](skill/SKILL.md)** —— 提供 pd 语法知识（读）：
 
 - 输入中出现 **`//!pd`** → 后续内容按 pd 格式解析
 - 处理 `.pd` 文件、转 JSON、语法纠错
 
-安装到 AI 的 skill 目录即可（如 `~/.pi/agent/skills/` 或项目 `.agents/skills/`）。
+**② 作者版 [`skill/pd-author/SKILL.md`](skill/pd-author/SKILL.md)** —— 教 AI **写**结构化提示词（默认 pd，不用 markdown）：
+
+- 结构化 prompt（角色/目标/约束/步骤/示例…）→ 默认输出 pd 结构，键替代 `#` 标题
+- 含通用 prompt 骨架模板、领域范例、作者视角避坑清单
+- 触发词：写提示词、组织提示词、提示词结构、用 pd 写
+
+安装到 AI 的 skill 目录即可（如 `~/.pi/agent/skills/` 或项目 `.agents/skills/`，`pd-author/` 目录整体复制为独立 skill）。
 
 ## 🛠️ 开发
 
