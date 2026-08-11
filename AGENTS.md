@@ -12,7 +12,7 @@
   - `pnpm dlx <pkg>` 或 `pnpm exec <pkg>` 替代 npx
   - `pnpm typecheck` / `pnpm test` / `pnpm build` 等脚本
 - 不要在本项目运行 `npm install` / `npm publish` / `npx`——一律用 pnpm 形式
-- 发布脚本：`pnpm release <patch|minor|major> [--dry-run]`（参考 `scripts/publish.mjs`）
+- 发布脚本：`pnpm release <patch|minor|major> [--dry-run]` / `pnpm release-all <patch|minor|major> [--dry-run]`（参考 `scripts/publish.mjs`）
 - 构建脚本白名单：`pnpm-workspace.yaml` 的 `allowBuilds`（esbuild、@vscode/vsce-sign；keytar 禁止）——新增依赖若被阻止构建，在此批准
 
 ## Commands
@@ -25,6 +25,7 @@
 | `node dist/format-cli.js <file> [-w]` | 格式化 pd 文本（发布后为 `pdformat` 命令） |
 | `pnpm exec vsce package` | 生成 .vsix（或 `pnpm package`） |
 | `pnpm release <patch\|minor\|major>` | 一键发布：校验 → 测试 → bump → commit+tag → publish → vsce package |
+| `pnpm release-all <patch\|minor\|major>` | npm + VSCode 一起发：npm 失败中止，vsce 失败降级为只发 npm |
 
 ## Architecture
 
@@ -55,7 +56,12 @@ src/
 - 顶层 `-` 不允许缩进（编译报错；format 时自动修正）
 - 对换行极不敏感：空行基本无视
 
-## Release Flow（`pnpm release`）
+## Release Flow（`pnpm release` / `pnpm release-all`）
+
+两种模式共用同一流程（门禁 → bump → commit+tag → pnpm publish → vsce package → vsce publish），区别在第 6 步：
+
+- `release`：设置了 `VSCE_PAT` 才发布扩展，失败警告；否则跳过
+- `release-all`：**npm 铁定发**（失败即中止，版本已锚定）；vsce publish 必走，未设 `VSCE_PAT` 或失败时**降级为只发 npm**（提示，不中止，可稍后手动补发）
 
 1. 参数校验：`patch | minor | major` 恰好一个；`--dry-run` 只预览
 2. dirty tree 警告（不阻塞）
@@ -80,5 +86,5 @@ src/
 - 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/SKILL.md` → fixtures
 - 格式化规则（src/format.ts）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
 - **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
-- 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release`
+- 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release` / `pnpm release-all`
 - `.npmignore` 控制发布内容（pnpm 复用 npm 的发布文件机制，勿删）；新增发布文件记得检查它

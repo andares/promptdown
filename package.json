@@ -67,6 +67,7 @@
     "test": "tsx --test test/*.test.ts",
     "package": "vsce package",
     "release": "node ./scripts/publish.mjs",
+    "release-all": "node ./scripts/publish.mjs all",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

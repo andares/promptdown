@@ -1,40 +1,44 @@
-import { lex } from "./parser/lexer";
+import { hasLiteralColon, lex } from "./parser/lexer";
 import { parse } from "./parser/parser";
 
 /**
- * 键值识别（仅用于格式化）：
- * - 半角冒号：与 lexer 语义一致，键名可含空格（`name1 : some` 也是键值）
- * - 全角冒号：键名紧贴冒号（`name1：some`）；`no ：a1`（空格+引用形态）不是键值
+ * 格式化阶段的首个键值冒号判定：
+ * - 整行含 `:-` / `：-` → 无键值
+ * - 首个冒号是全角 `：` → 不论两侧空格，均作为键值分隔符
+ * - 首个冒号是半角 `:` → 原本合法，或左右都无空格时作为键值分隔符
  */
 function matchKeyValueFlex(
 	s: string,
 ): { key: string; value: string | undefined } | null {
-	const mHalf = s.match(/^([^\s:][^:]*):(?:\s*(.*))?$/);
-	if (mHalf) {
-		return {
-			key: (mHalf[1] as string).trim(),
-			value: mHalf[2] !== undefined ? (mHalf[2] as string).trim() : undefined,
-		};
+	if (hasLiteralColon(s)) return null;
+	const separator = s.search(/[：:]/);
+	if (separator <= 0) return null;
+
+	const keySource = s.slice(0, separator);
+	const marker = s[separator];
+	const valueSource = s.slice(separator + 1);
+	if (keySource.trim() === "") return null;
+
+	if (marker === ":") {
+		const leftHasSpace = /\s$/.test(keySource);
+		const rightHasSpace = /^\s/.test(valueSource);
+		if (valueSource !== "" && leftHasSpace && !rightHasSpace) return null;
 	}
-	const mFull = s.match(/^([^\s：:]+)：(?:\s*(.*))?$/);
-	if (mFull) {
-		return {
-			key: mFull[1] as string,
-			value: mFull[2] !== undefined ? (mFull[2] as string).trim() : undefined,
-		};
-	}
-	return null;
+
+	const value = valueSource.trim();
+	return { key: keySource.trim(), value: value === "" ? undefined : value };
 }
 
-/** 引用规范化：全角冒号 → 半角；前后空格各压成恰好一个（行首/行尾边界除外） */
-function normalizeRefs(s: string): string {
-	return s
-		.replace(
-			/(?:^|(\s+))([：:])([A-Za-z0-9_-]+)(?=$|\s)/g,
-			(_m, sp: string | undefined, _c: string, name: string) =>
-				`${sp ? " " : ""}:${name}`,
-		)
-		.replace(/(:[A-Za-z0-9_-]+) {2,}(?=\S)/g, "$1 ");
+/** 后续全角冒号：左侧是空格才转半角；半角冒号与 `：-` 一律保持。 */
+function normalizeLaterColons(s: string, startsAfterSpace = false): string {
+	let out = "";
+	for (let i = 0; i < s.length; i++) {
+		const char = s[i] as string;
+		const leftHasSpace = i === 0 ? startsAfterSpace : /\s/.test(s[i - 1] as string);
+		if (char === "：" && s[i + 1] !== "-" && leftHasSpace) out += ":";
+		else out += char;
+	}
+	return out;
 }
 
 /** 单行格式化 */
@@ -60,22 +64,22 @@ function formatLine(raw: string): string {
 
 	const kv = matchKeyValueFlex(rest);
 	if (kv) {
-		// 键值规范化：key: value（冒号后恰好一个空格；无值则裸冒号）
+		// 首个分隔符统一为 `: `；后续只按左侧空格规则处理全角冒号。
 		rest =
 			kv.value !== undefined
-				? `${kv.key}: ${normalizeRefs(kv.value)}`
+				? `${kv.key}: ${normalizeLaterColons(kv.value, true)}`
 				: `${kv.key}:`;
 	} else {
-		rest = normalizeRefs(rest);
+		rest = normalizeLaterColons(rest);
 	}
 	return `${" ".repeat(indent)}${prefix}${rest}`;
 }
 
 /**
  * 格式化 pd 文本：
- * 1. 全角冒号 `：` → 半角 `:`（键值/引用位置）
- * 2. 键值冒号后恰好一个空格（`key: value`）
- * 3. 引用 ` :refname ` 前后各一个空格（行首/行尾边界除外）
+ * 1. `:-` / `：-` 所在行不识别键值
+ * 2. 首个全角冒号，或两侧均无空格的首个半角冒号 → `: `
+ * 3. 后续全角冒号仅在左侧有空格时转半角；后续半角冒号不处理
  * 4. 顶层 `- ` 缩进自动修正（去缩进；编译工具报错的同一规则）
  * 5. 行尾空白清理
  */

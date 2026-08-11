@@ -24,7 +24,7 @@
 | 📦 **可转 JSON** | `pd2json` CLI 单向转换，输出稳定、可机读 |
 | 🔗 **嵌套引用** | `:refname` 编译期内联展开，多段 `//!pd <name>` 混排复用 |
 | 🎨 **VSCode 高亮** | TextMate grammar 纯声明式扩展，**无需 LSP**，零红线 |
-| ✨ **自动格式化** | CLI `pdformat` + VSCode 格式化程序，全角冒号/引用空格/顶层缩进一键规范 |
+| ✨ **自动格式化** | CLI `pdformat` + VSCode 格式化程序，首个/后续冒号判定与顶层缩进一键规范 |
 | 🤖 **AI 友好** | 内置 skill：看到 `//!pd` 即按 pd 格式解析 |
 | 📝 **兼容 Markdown** | 内联 `**粗体**`、`` `代码` `` 等保留原文，混输无压力 |
 
@@ -68,16 +68,19 @@ words
 | --- | --- |
 | `//!pd <name>` | 段标记（可省略）：声明 pd 内容开始；多段混排实现引用 |
 | `---` | 分隔线：块边界，指针回根 |
-| `key: content` | 裸键值：在根创建键，独立成父亲 |
-| `- key: content` | 带 `-` 键值：按缩进找爸爸嵌套 |
+| `key: content` | 裸键值：仅第一个冒号分隔键和值；在根创建键，独立成父亲 |
+| `- key: content` | 带 `-` 键值：仅第一个冒号分隔键和值；按缩进找爸爸嵌套 |
 | `- content` / `content` | 内容行：按缩进找爸爸，压入 Info 数组 |
 | ` :refname ` | 引用：前后必须带空格，编译期内联展开 |
+| `:-` / `：-` | 普通冒号标记：整行不识别键值，标记本身也不是引用 |
 
 ### 核心规则
 
 | 规则 | 说明 |
 | --- | --- |
 | 🔑 **折叠** | 键内只有单条字串 → `"key": "value"`；多行或混排 → `{ "Info1": [...] }` |
+| `:` **首个分隔** | 每行仅第一个冒号有键值语义；后续冒号不会再开启键值，` :ref ` 仍按引用规则处理 |
+| `:-` **普通冒号** | 行内出现 `:-` 或 `：-` 时整行不含键值，但不影响后续引用 |
 | 📋 **Info** | 无 key 内容归默认键 `Info`（数组），编号每层独立（Info1/Info2...） |
 | 🗂️ **Subject** | 顶层无 key 内容进匿名根 `Subject1/Subject2...` |
 | 🌳 **找爸爸** | 裸键值行不找爸爸；带 `-` 行与内容行按缩进找爸爸；同缩进 → 平级 |
@@ -129,9 +132,9 @@ pdformat <file.pd> [-w|--write]   # 默认输出 stdout；-w 写回原文件
 
 格式化规则：
 
-- 全角冒号 `：` → 半角 `:`（键值/引用位置）
-- 键值冒号后恰好一个空格（`key: value`）
-- 引用 ` :refname ` 前后各一个空格
+- 首个全角冒号不论两侧空格均格式化为 `:`；无空格的首个半角冒号补右侧空格
+- 后续全角冒号仅在左侧有空格时转半角；后续半角冒号不处理
+- `:-` / `：-` 所在行不识别键值，但后续引用仍有效
 - 顶层 `-` 缩进自动修正
 - 行尾空白清理
 
@@ -159,7 +162,7 @@ code --install-extension promptdown-<version>.vsix
 - 也可右键 → **Format Document**
 - 想保存时自动格式化：设置 `"editor.formatOnSave": true`（或仅对 pd：`"[promptdown]": { "editor.formatOnSave": true }`）
 
-格式化规则与 `pdformat` CLI 一致（全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白）。
+格式化规则与 `pdformat` CLI 一致（首个键值冒号、后续全角冒号、`:-` 普通冒号标记、顶层 `-` 缩进和行尾空白）。
 
 ### 📁 文件图标
 
@@ -193,12 +196,13 @@ pnpm package     # 打包 .vsix
 ### 发布
 
 ```bash
-pnpm release patch   # 0.1.0 → 0.1.1（也可用 minor / major）
+pnpm release patch        # 只发 npm（0.1.0 → 0.1.1，vsce 有 token 才发）
+pnpm release-all patch    # npm + VSCode 一起发：npm 失败中止，vsce 失败只提示
 pnpm release patch -- --dry-run   # 先预览计划
 ```
 
 一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `vsce package`。
-设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后还会自动上传扩展市场。
+设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后自动上传扩展市场；`release-all` 模式下 npm 发布失败即中止，扩展发布失败则降级为仅 npm 已发布（可稍后手动补发）。
 
 ## 📁 项目结构
 

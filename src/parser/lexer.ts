@@ -1,15 +1,27 @@
 import type { LineKind, PLine } from "./types";
 
 /**
- * 键值判定：冒号前无空格（区分引用 ` :name `），冒号后为行尾或空格+内容。
- * `name1:` / `name1: some` / `kill: me` → 键值；`no man` / `a:b` → null
+ * `:-` / `：-` 是整行键值转义：只要出现，整行都不含键值。
+ * 否则仅行内第一个半角冒号可作分隔符；其右侧不再识别键值。
+ * 冒号后为行尾或空格+内容；无空格写法可先由 formatter 修正。
  */
+export function hasLiteralColon(s: string): boolean {
+	return s.includes(":-") || s.includes("：-");
+}
+
 export function matchKeyValue(
 	s: string,
 ): { key: string; value: string | undefined } | null {
-	const m = s.match(/^([^\s:][^:]*):(?:\s+(.*))?$/);
-	if (!m) return null;
-	return { key: m[1] as string, value: m[2] !== undefined ? m[2] : undefined };
+	if (hasLiteralColon(s)) return null;
+	const separator = s.indexOf(":");
+	if (separator === -1) return null;
+
+	const key = s.slice(0, separator);
+	const value = s.slice(separator + 1);
+	if (!/^[^\s:][^:]*$/.test(key)) return null;
+	if (value !== "" && !/^\s+/.test(value)) return null;
+
+	return { key, value: value === "" ? undefined : value.trimStart() };
 }
 
 /** 单行分类 */

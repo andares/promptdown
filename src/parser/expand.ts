@@ -12,7 +12,8 @@ interface RefToken {
 	end: number; // body 中引用名结束偏移
 }
 
-const REF_RE = /(?:^|\s):([A-Za-z0-9_-]+)(?=\s|$)/g;
+// `:-` / `：-` 是普通冒号标记，因此引用名不能以 `-` 开头。
+const REF_RE = /(?:^|\s):([A-Za-z0-9_][A-Za-z0-9_-]*)(?=\s|$)/g;
 const MAX_DEPTH = 32;
 
 /**

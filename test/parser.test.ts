@@ -60,6 +60,47 @@ test("范例4: 多段 + 引用内联展开（指定段名 a2）", () => {
 	});
 });
 
+test("键值仅以第一个冒号分隔，右值中的冒号原样进入 JSON", () => {
+	const text = `title: first: second: third
+- child: https://example.com:8443/path`;
+	assert.deepEqual(fromText(text), {
+		title: {
+			Info1: ["first: second: third"],
+			child: "https://example.com:8443/path",
+		},
+	});
+});
+
+test(":- / ：- 使整行不含键值，内容原样进入 Subject", () => {
+	assert.deepEqual(fromText("clock:- 12:30"), {
+		Subject1: { Info1: ["clock:- 12:30"] },
+	});
+	assert.deepEqual(fromText("clock：- 12:30"), {
+		Subject1: { Info1: ["clock：- 12:30"] },
+	});
+	assert.deepEqual(fromText("name: value :- literal"), {
+		Subject1: { Info1: ["name: value :- literal"] },
+	});
+});
+
+test("冒号规则 fixture：首个键值 + 普通冒号标记", () => {
+	assert.deepEqual(fromFile("colon.pd"), {
+		title: "first: second: third",
+		Subject1: { Info1: ["clock:- 12:30"] },
+		Subject2: { Info1: ["clock：- 12:30"] },
+	});
+});
+
+test(":- 转义不影响同一行后续引用", () => {
+	const text = `//!pd base
+hello world
+//!pd main
+clock:- 12:30 :base done`;
+	assert.deepEqual(fromText(text, "main"), {
+		Subject1: { Info1: ["clock:- 12:30 hello world done"] },
+	});
+});
+
 test("多段文件不指定段名 → 报错", () => {
 	assert.throws(() => fromFile("ref.pd"), /必须指定段名/);
 });
@@ -81,7 +122,18 @@ test("顶层 - 缩进 → 语法错误", () => {
 	assert.match(doc.errors[0]?.message ?? "", /顶层 `-` 不允许缩进/);
 });
 
-test("纯文字引用 → 内联嵌入（保留前后空格）", () => {
+test("内容行中的纯文字引用 → 内联嵌入（保留前后空格）", () => {
+	const text = `//!pd base
+hello world
+//!pd main
+msg:
+- say :base please`;
+	assert.deepEqual(fromText(text, "main"), {
+		msg: { Info1: ["say hello world please"] },
+	});
+});
+
+test("键值右值中的纯文字引用 → 内联嵌入（保留前后空格）", () => {
 	const text = `//!pd base
 hello world
 //!pd main

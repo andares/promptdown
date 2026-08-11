@@ -5,6 +5,7 @@
   "patterns": [
     { "include": "#section" },
     { "include": "#separator" },
+    { "include": "#literal-colon" },
     { "include": "#ref" },
     { "include": "#key" },
     { "include": "#info" },
@@ -27,15 +28,20 @@
       }
     },
     "ref": {
-      "comment": ":refname 引用（前后带空格）",
-      "match": "(?:^|\\s)(:[A-Za-z0-9_-]+)(?=\\s|$)",
+      "comment": ":refname 引用（前后带空格；引用名不能以 - 开头）",
+      "match": "(?:^|\\s)(:[A-Za-z0-9_][A-Za-z0-9_-]*)(?=\\s|$)",
       "captures": {
         "1": { "name": "markup.quote.pd" }
       }
     },
+    "literal-colon": {
+      "comment": ":- / ：- 普通冒号标记：整行不识别键值，本标记也不是引用",
+      "match": "[：:]-",
+      "name": "string.unquoted.pd"
+    },
     "key": {
-      "comment": "键值：key: / - key:（冒号前无空格）",
-      "match": "^(\\s*)(-\\s+)?([^\\s:][^:]*)(:)(?=\\s|$)",
+      "comment": "键值：含 :- / ：- 的行不识别键值；否则仅第一个半角冒号为分隔符",
+      "match": "^(?!.*[：:]-)(\\s*)(-\\s+)?([^\\s:][^:]*)(:)(?=\\s|$)",
       "captures": {
         "2": { "name": "punctuation.definition.list.pd" },
         "3": { "name": "entity.name.tag.pd" },
@@ -44,7 +50,7 @@
     },
     "info": {
       "comment": "Info 默认键（Info1/Info2...）",
-      "match": "^(\\s*)(-\\s+)?(Info\\d+)(:)(?=\\s|$)",
+      "match": "^(?!.*[：:]-)(\\s*)(-\\s+)?(Info\\d+)(:)(?=\\s|$)",
       "captures": {
         "2": { "name": "punctuation.definition.list.pd" },
         "3": { "name": "support.constant.pd" },
@@ -53,10 +59,9 @@
     },
     "item": {
       "comment": "- 序列项",
-      "match": "^(\\s*)(-\\s+)(.*)$",
+      "match": "^(\\s*)(-\\s+)",
       "captures": {
-        "2": { "name": "punctuation.definition.list.pd" },
-        "3": { "name": "string.unquoted.pd" }
+        "2": { "name": "punctuation.definition.list.pd" }
       }
     }
   }
