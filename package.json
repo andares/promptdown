@@ -73,6 +73,7 @@
     "package": "vsce package --no-dependencies",
     "release": "node ./scripts/publish.mjs",
     "release-all": "node ./scripts/publish.mjs all",
+    "tag-current": "node ./scripts/tag-current.mjs",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

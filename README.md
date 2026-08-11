@@ -228,11 +228,12 @@ pnpm package     # 以 --no-dependencies 打包 .vsix
 ```bash
 pnpm release patch        # 只发 npm（0.1.0 → 0.1.1，vsce 有 token 才发）
 pnpm release-all patch    # npm + VSCode 一起发：npm 失败中止，vsce 失败只提示
+pnpm tag-current          # 给当前版本打本地 tag vX.Y.Z（已存在则跳过，不推送）
 pnpm release patch -- --dry-run   # 先预览计划
 ```
 
-一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `vsce package --no-dependencies`。
-设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后自动上传扩展市场；`release-all` 模式下 npm 发布失败即中止，扩展发布失败则降级为仅 npm 已发布（可稍后手动补发）。
+一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → GitHub 推送 + 创建 Release → `vsce package --no-dependencies`。
+设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后自动上传扩展市场；`release-all` 模式下 npm 发布失败即中止（版本已锚定），GitHub 推送/建 Release 与扩展发布均为 best-effort：失败只提示，可稍后手动补发。GitHub Release 需要 `GITHUB_TOKEN`（fine-grained token，Contents: write）。
 
 ## 📁 项目结构
 
