@@ -5,6 +5,11 @@ skill/
 docs/
 scripts/
 tmp/
+.pi-subagents/
+.pi-lens.json
+AGENTS.md
+icons/concepts/
+icons/pd.svg
 tsconfig.json
 .git/
 .vscode/

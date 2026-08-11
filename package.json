@@ -5,6 +5,7 @@
   "version": "0.1.1",
   "publisher": "andares",
   "license": "MIT",
+  "icon": "icons/pd-icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
     "onLanguage:promptdown"
@@ -42,6 +43,10 @@
         "extensions": [
           ".pd"
         ],
+        "icon": {
+          "light": "./icons/pd-icon.png",
+          "dark": "./icons/pd-icon.png"
+        },
         "configuration": "./language-configuration.json"
       }
     ],
@@ -65,7 +70,7 @@
     "watch": "tsc -w -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "package": "vsce package",
+    "package": "vsce package --no-dependencies",
     "release": "node ./scripts/publish.mjs",
     "release-all": "node ./scripts/publish.mjs all",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"

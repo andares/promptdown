@@ -128,7 +128,9 @@ if (dryRun) {
 	console.log(`  1. pnpm typecheck && pnpm test && pnpm build`);
 	console.log(`  2. bump package.json version → ${next}`);
 	if (tagExists(`v${next}`)) {
-		console.log(`  3. git commit -m "chore: release v${next}"（tag v${next} 已存在，跳过打 tag）`);
+		console.log(
+			`  3. git commit -m "chore: release v${next}"（tag v${next} 已存在，跳过打 tag）`,
+		);
 	} else {
 		console.log(
 			`  3. git commit -m "chore: release v${next}" && git tag v${next}`,
@@ -137,7 +139,9 @@ if (dryRun) {
 	console.log(
 		`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`,
 	);
-	console.log(`  5. pnpm exec vsce package → promptdown-${next}.vsix`);
+	console.log(
+		`  5. pnpm exec vsce package --no-dependencies → promptdown-${next}.vsix`,
+	);
 	if (mode === "all") {
 		console.log(
 			process.env.VSCE_PAT
@@ -213,12 +217,14 @@ if (publish.status !== 0) {
 }
 
 // 5. Package VSCode extension (.vsix).
-step("pnpm exec vsce package");
-const vsce = run(pnpm, ["exec", "vsce", "package"], { allowFailure: true });
+step("pnpm exec vsce package --no-dependencies");
+const vsce = run(pnpm, ["exec", "vsce", "package", "--no-dependencies"], {
+	allowFailure: true,
+});
 if (vsce.status !== 0) {
 	console.warn(
 		`${C.yellow}vsce package failed — pnpm 已发布，但 .vsix 未生成。` +
-			`\n  可手动运行: pnpm exec vsce package${C.reset}`,
+			`\n  可手动运行: pnpm exec vsce package --no-dependencies${C.reset}`,
 	);
 } else {
 	console.log(`${C.dim}vsix: ${ROOT}/promptdown-${next}.vsix${C.reset}`);
@@ -234,9 +240,11 @@ if (mode === "all") {
 				`\n  稍后可手动: export VSCE_PAT=... && pnpm exec vsce publish${C.reset}`,
 		);
 	} else {
-		const vp = run(pnpm, ["exec", "vsce", "publish", "--skip-duplicate"], {
-			allowFailure: true,
-		});
+		const vp = run(
+			pnpm,
+			["exec", "vsce", "publish", "--skip-duplicate", "--no-dependencies"],
+			{ allowFailure: true },
+		);
 		if (vp.status !== 0) {
 			console.warn(
 				`${C.yellow}vsce publish failed — npm 已发布 v${next}，扩展需手动上传 .vsix。${C.reset}`,
@@ -245,9 +253,11 @@ if (mode === "all") {
 	}
 } else if (process.env.VSCE_PAT) {
 	step("pnpm exec vsce publish");
-	const vp = run(pnpm, ["exec", "vsce", "publish", "--skip-duplicate"], {
-		allowFailure: true,
-	});
+	const vp = run(
+		pnpm,
+		["exec", "vsce", "publish", "--skip-duplicate", "--no-dependencies"],
+		{ allowFailure: true },
+	);
 	if (vp.status !== 0) {
 		console.warn(
 			`${C.yellow}vsce publish failed — pnpm 包已发布，扩展需手动上传 .vsix。${C.reset}`,

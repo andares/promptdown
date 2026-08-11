@@ -2,7 +2,7 @@
   "extends": "vs-seti",
   "iconDefinitions": {
     "_pd": {
-      "iconPath": "./icons/pd.svg"
+      "iconPath": "../icons/pd-icon.png"
     }
   },
   "fileExtensions": {

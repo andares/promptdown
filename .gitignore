@@ -3,5 +3,17 @@ dist/
 *.vsix
 *.tgz
 pnpm-debug.log*
+*.log
 .DS_Store
 tmp/
+
+# pi 工具运行产物（subagent 会话/临时文件）
+.pi-subagents/
+
+# 设计概念图（非运行时资源）
+icons/concepts/
+
+# 环境变量（如含密钥勿提交）
+.env
+.env.*
+!.env.example

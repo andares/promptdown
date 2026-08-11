@@ -1,6 +1,8 @@
 <div align="center">
 
-# 📄 promptdown
+<img src="icons/pd-icon.png" alt="promptdown icon" width="128" height="128">
+
+# promptdown
 
 **极简标记语言 · 兼容 Markdown 风格 · 一键转 JSON**
 
@@ -148,6 +150,8 @@ pdformat <file.pd> [-w|--write]   # 默认输出 stdout；-w 写回原文件
 - 🔗 引用 `:refname`
 - 📋 `-` 序列项
 
+扩展详情页、扩展列表和 `.pd` 语言均使用 `icons/pd-icon.png` 作为品牌图标。
+
 纯声明式扩展（无 LSP），不会产生任何诊断红线。
 
 ```bash
@@ -172,7 +176,7 @@ code --install-extension promptdown-<version>.vsix
 - 或 settings.json 里设 `"workbench.iconTheme": "promptdown-icons"`
 
 > 注：VSCode 不允许扩展强制覆盖用户的图标主题，需要在设置里手动切换一次。
-> 因为继承了 Seti，其他文件图标保持不变，只有 `.pd` 显示专属图标。
+> 因为继承了 Seti，其他文件图标保持不变，只有 `.pd` 显示 `icons/pd-icon.png`。扩展也提供了语言图标回退，但最终是否展示仍由当前文件图标主题决定；选择 `promptdown Icons` 可确保资源管理器与编辑器标签页显示专属图标。
 
 ## 🤖 AI Skill
 
@@ -190,7 +194,7 @@ pnpm install
 pnpm typecheck   # 类型检查
 pnpm test        # node:test（12+ 用例覆盖全部语法规则）
 pnpm build       # tsc → dist/
-pnpm package     # 打包 .vsix
+pnpm package     # 以 --no-dependencies 打包 .vsix
 ```
 
 ### 发布
@@ -201,13 +205,14 @@ pnpm release-all patch    # npm + VSCode 一起发：npm 失败中止，vsce 失
 pnpm release patch -- --dry-run   # 先预览计划
 ```
 
-一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `vsce package`。
+一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `vsce package --no-dependencies`。
 设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后自动上传扩展市场；`release-all` 模式下 npm 发布失败即中止，扩展发布失败则降级为仅 npm 已发布（可稍后手动补发）。
 
 ## 📁 项目结构
 
 ```
 promptdown/
+├── icons/pd-icon.png   # 扩展品牌图标 + .pd 文件图标
 ├── src/parser/          # 语法引擎（lexer → parser → toJson → expand）
 ├── src/cli.ts           # pd2json CLI
 ├── syntaxes/            # TextMate 语法高亮

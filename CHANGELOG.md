@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icons/pd-icon.png" alt="promptdown icon" width="96" height="96">
+</p>
+
 # Changelog
 
 ## 0.1.0 (2026-08-11)
