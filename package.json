@@ -2,13 +2,15 @@
   "name": "promptdown",
   "displayName": "promptdown",
   "description": "极简标记语言 promptdown（.pd）：兼容 markdown 风格，可转 JSON，提供 VSCode 语法高亮与 pd2json CLI",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "publisher": "andares",
   "license": "MIT",
   "icon": "icons/pd-icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onLanguage:promptdown"
+    "onLanguage:promptdown",
+    "onDidOpenTextDocument",
+    "onDidChangeTextDocument"
   ],
   "repository": {
     "type": "git",
@@ -54,7 +56,31 @@
       {
         "language": "promptdown",
         "scopeName": "source.pd",
-        "path": "./syntaxes/pd.tmLanguage.json"
+        "path": "./syntaxes/pd.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.js": "javascript",
+          "source.ts": "typescript",
+          "source.json": "json",
+          "source.json.comments": "jsonc",
+          "source.python": "python",
+          "source.shell": "shellscript",
+          "text.html.derivative": "html",
+          "source.css": "css",
+          "source.yaml": "yaml",
+          "source.sql": "sql",
+          "source.go": "go",
+          "source.php": "php",
+          "source.elixir": "elixir",
+          "source.fish": "fish",
+          "source.cs": "csharp",
+          "source.rescript": "rescript",
+          "source.wgsl": "wgsl",
+          "source.rust": "rust",
+          "source.scala": "scala",
+          "source.gleam": "gleam",
+          "source.cpp": "cpp",
+          "source.moonbit": "moonbit"
+        }
       }
     ],
     "iconThemes": [
@@ -63,7 +89,17 @@
         "label": "promptdown Icons",
         "path": "./theme/pd-icon-theme.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "promptdown",
+      "properties": {
+        "promptdown.autoDetect": {
+          "type": "boolean",
+          "default": true,
+          "description": "untitled / 未知扩展名等弱语法文件中出现 //!pd 段标记行时，自动把文档语言切换为 promptdown（获得高亮与格式化）。有自身语法的文件（md/js 等）不受影响。"
+        }
+      }
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -74,7 +110,8 @@
     "release": "node ./scripts/publish.mjs",
     "release-all": "node ./scripts/publish.mjs all",
     "tag-current": "node ./scripts/tag-current.mjs",
-    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
+    "wsl-install": "node ./scripts/wsl-install.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
