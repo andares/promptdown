@@ -7,10 +7,10 @@
  */
 
 /** 段标记行：行首（允许缩进）+ //!pd + 词边界（防 //!pdx 误判） */
-export const PD_MARKER_LINE_RE = /^\s*\/\/!pd\b/;
+const PD_MARKER_LINE_RE = /^\s*\/\/!pd\b/;
 
 /** 预筛：行首（允许缩进）是 // —— 只有注释风格的行才可能成为段标记 */
-export const PD_PREFIX_RE = /^\s*\/\//;
+const PD_PREFIX_RE = /^\s*\/\//;
 
 /**
  * 打开时检测：只扫前 maxLines 行（段标记总在文档开头附近），

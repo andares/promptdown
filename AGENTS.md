@@ -5,15 +5,21 @@
 
 ## Package Management
 
-- **本项目使用 `pnpm` 作为唯一包管理器。**
-- 一律使用 pnpm 形式：
+**两条线，不要混淆（2025-08 起约定，勿改回）：**
+
+- **用户层安装指导（对外文档）一律用 `npm`**：安装命令为 `npm install -g @andares/promptdown`。
+  原因：pnpm 全局机制（store/hardlink 布局）是为开发期库依赖优化的，不适合管理全局 CLI 工具，
+  本机全局工具安装已从 pnpm 换回 npm。改 README / docs / 教程里的安装示例时保持 npm，
+  不要写成 `pnpm add -g`。
+- **项目内开发工具链用 `pnpm`**（唯一包管理器）：
   - `pnpm install` / `pnpm add -D <pkg>` / `pnpm remove`
   - `pnpm publish`（由 `pnpm release` 自动执行，不要手动跑）
   - `pnpm dlx <pkg>` 或 `pnpm exec <pkg>` 替代 npx
   - `pnpm typecheck` / `pnpm test` / `pnpm build` 等脚本
-- 不要在本项目运行 `npm install` / `npm publish` / `npx`——一律用 pnpm 形式
+- 不要在项目内跑 `npm install` / `npm publish` / `npx`——开发链路一律 pnpm 形式
 - 发布脚本：`pnpm release <patch|minor|major> [--dry-run]` / `pnpm release-all <patch|minor|major> [--dry-run]`（参考 `scripts/publish.mjs`）
 - 构建脚本白名单：`pnpm-workspace.yaml` 的 `allowBuilds`（esbuild、@vscode/vsce-sign；keytar 禁止）——新增依赖若被阻止构建，在此批准
+- 本机 pi skill 注册：`~/.pi/agent/settings.json` 的 `skills` 数组指向 `~/.pi/agent/skills/promptdown`（软链到 npm 全局包 `@andares/promptdown` 的 `skill/` 目录，自动发现 `promptdown` 与 `pd-author` 两个 skill）。node 升级导致 fnm 版本路径变化时，只需重指该软链，不要改回 pnpm 路径。
 
 ## Commands
 
@@ -59,26 +65,26 @@ src/
 
 ## Release Flow（`pnpm release` / `pnpm release-all`）
 
-两种模式共用基础流程（门禁 → bump → commit+tag → pnpm publish → push 分支+tags），差异：
+两种模式共用基础流程（sync → 门禁 → bump → commit+tag → pnpm publish → push 分支+tags → 创建 GitHub Release），**一个步骤都不能少**。差异仅在末尾：
 
-- `release`：**只发 npm**：门禁 → bump → commit+tag → pnpm publish → `git push origin <当前分支> --tags`（best-effort，失败仅警告）。**不做 vsce package/publish，不创建 GitHub Release**
-- `release-all`：**npm 铁定发**（失败即中止，版本已锚定）；npm 成功后**推 GitHub 并建 Release**（best-effort）；vsce package + publish 必走，无 vsce 凭据或失败时**降级为只发 npm**（提示，不中止，可稍后手动补发）
+- `release`：**不跑 vsce**——即不做 vsce package/publish
+- `release-all`：**追加 vsce**——vsce package + publish 必走，无 vsce 凭据或失败时**降级为只发 npm**（提示，不中止，可稍后手动补发）；npm 失败即中止（版本已锚定）
 
 1. 参数校验：`patch | minor | major` 恰好一个；`--dry-run` 只预览
-2. dirty tree 警告（不阻塞）
+2. **sync**：未提交改动 → `git add -A` + commit `chore: sync uncommitted changes before release`；本地领先远端 → `git push origin <分支>`（失败中止）；都没有 → 跳过不推。保证 release commit 与 tag 建立在线上最新代码上，不会出现“文件没提交但 tag 已打”
 3. 门禁：typecheck + test + build，失败即中止
 4. bump `package.json` version（2 空格缩进 + 尾换行）
 5. `git commit -m "chore: release vX.Y.Z"`，然后调用 `scripts/tag-current.mjs` 打 tag（检测已存在 → 不重复打，指向 release commit）
 6. `pnpm publish --no-git-checks --access=public`（prepublishOnly 再次门禁 typecheck+test+build；失败中止，回滚见下）
 7. `git push origin <当前分支> --tags`（两种模式都做，尝试一次，失败仅警告——可能此前已推过）
-8. **[release-all]** 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；未设 token / 其他失败 → 仅警告）
-9. **[release-all]** `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`；若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据（`pnpm exec vsce login andares` 存的明文文件——本机 keytar 原生模块未编译，vsce 自动降级为文件存储），自动 `vsce publish`；否则提示手动补发
+8. 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；未设 token / 其他失败 → 仅警告）——**两种模式都做**
+9. **[release-all 追加]** `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`；若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据（`pnpm exec vsce login andares` 存的明文文件——本机 keytar 原生模块未编译，vsce 自动降级为文件存储），自动 `vsce publish`；否则提示手动补发
 
 `pnpm tag-current` 可独立使用：给当前 HEAD 打本地 `v{version}` tag（已存在则跳过），**只打 tag 不推送**。
 
 **npm 包名与仓库名不同**：npm registry 上 `promptdown` 已被他人占用（相似度保护会拒绝近似名），
 所以发布 npm 时脚本切换为 scoped 名 **`@andares/promptdown`**（`--access=public`），发布后恢复为
-`promptdown`（vsce 需要非 scoped 名，扩展 ID 为 `andares.promptdown`）。安装命令：`pnpm add -g @andares/promptdown`。
+`promptdown`（vsce 需要非 scoped 名，扩展 ID 为 `andares.promptdown`）。安装命令：`npm install -g @andares/promptdown`。
 
 发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`
 

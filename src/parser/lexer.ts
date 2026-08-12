@@ -1,4 +1,4 @@
-import type { LineKind, PLine } from "./types";
+import type { PLine } from "./types";
 
 /**
  * `:-` / `：-` 是整行键值转义：只要出现，整行都不含键值。
@@ -9,7 +9,7 @@ export function hasLiteralColon(s: string): boolean {
 	return s.includes(":-") || s.includes("：-");
 }
 
-export function matchKeyValue(
+function matchKeyValue(
 	s: string,
 ): { key: string; value: string | undefined } | null {
 	if (hasLiteralColon(s)) return null;
@@ -72,5 +72,3 @@ export function lex(text: string): PLine[] {
 	text.split(/\r?\n/).forEach((raw, i) => lines.push(lexLine(raw, i + 1)));
 	return lines;
 }
-
-export type { LineKind };

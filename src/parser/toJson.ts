@@ -3,7 +3,7 @@ import type { Block, CodeBlock, PdDoc } from "./types";
 export type JsonValue = string | string[] | { [k: string]: JsonValue };
 
 /** 单块转 JSON：折叠规则（单条 inline 且无子键/无代码块 → 字符串；否则对象） */
-export function blockToJson(b: Block): JsonValue {
+function blockToJson(b: Block): JsonValue {
 	const onlyInline =
 		b.inline !== null &&
 		b.entries.size === 0 &&

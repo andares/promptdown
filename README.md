@@ -45,7 +45,7 @@
 ## 🚀 快速开始
 
 ```bash
-pnpm add -g @andares/promptdown
+npm install -g @andares/promptdown
 pd2json your-prompt.pd
 ```
 
@@ -323,8 +323,8 @@ pnpm tag-current          # 给当前版本打本地 tag vX.Y.Z（已存在则�
 pnpm release patch -- --dry-run   # 先预览计划
 ```
 
-- `pnpm release`：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `git push origin <分支> --tags`。**不做 vsce、不创建 GitHub Release**
-- `pnpm release-all`：在 release 基础上再推 GitHub 并创建 Release，`vsce package --no-dependencies` 后自动发布扩展。设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后自动上传扩展市场；npm 发布失败即中止（版本已锚定），GitHub 推送/建 Release 与扩展发布均为 best-effort：失败只提示，可稍后手动补发。GitHub Release 需要 `GITHUB_TOKEN`（fine-grained token，Contents: write）。
+- `pnpm release`：sync（未提交改动自动 commit、未推送自动 push，没有则跳过）→ 门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `git push origin <分支> --tags` → 创建 GitHub Release。**不做 vsce**
+- `pnpm release-all`：与 release **前面完全一样（一个步骤不少）**，末尾追加 vsce package + publish；npm 失败中止，vsce 失败降级为只发 npm
 
 ## 📁 项目结构
 
