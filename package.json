@@ -33,7 +33,9 @@
   ],
   "bin": {
     "pd2json": "./dist/cli.js",
-    "pdformat": "./dist/format-cli.js"
+    "pdformat": "./dist/format-cli.js",
+    "hx-install": "./scripts/hx-install.mjs",
+    "wsl-install": "./scripts/wsl-install.mjs"
   },
   "contributes": {
     "commands": [

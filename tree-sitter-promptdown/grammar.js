@@ -47,8 +47,15 @@ module.exports = grammar({
 		key_value: ($) =>
 			seq(field("key", $.key_name), optional(field("value", $.value))),
 
-		// 值：单个正则 token 匹配行尾（含前导空白与冒号；不做 ref 拆分）
-		value: (_) => token(prec(1, /[ \t]*[^\n]+/)),
+		// 值：ref（:引用名）与文本片段交替（v4：value 位置的 _line 分支会失败，无 GLR 歧义）
+		value: ($) =>
+			prec.right(1, repeat1(choice(prec(2, $.ref), $.text_fragment))),
+
+		ref: (_) => token(prec(2, /:[^\s-][^\s]*/)),
+
+		// 文本片段：非空白/非冒号开头，到空白停（可含冒号——URL 等整体匹配，
+		// ref 只在冒号开头且前面无紧贴文本时参与）
+		text_fragment: (_) => token(prec(1, /[ \t]*[^\s:][^\s]*/)),
 
 		// - 序列项（ITEM_DASH = "- "，scanner；可嵌套键值）
 		item: ($) => seq($.item_dash, choice(prec(1, $.key_value), $.item_text)),

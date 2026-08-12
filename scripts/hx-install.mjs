@@ -67,47 +67,52 @@ function helixConfigDir() {
 function writeLanguagesToml(configDir) {
 	const path = join(configDir, "languages.toml");
 	const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
-	const hasLanguage = /name\s*=\s*"promptdown"/.test(existing);
-	if (hasLanguage) {
-		console.log(`${C.dim}languages.toml 已有 promptdown 条目，跳过${C.reset}`);
+	// grammar 块存在且路径一致 → 跳过；路径不同 → 更新（repo ↔ npm 包切换场景）
+	const grammarRe =
+		/\[\[grammar\]\]\nname = "promptdown"\nsource = \{ path = "([^"]*)" \}/;
+	const m = existing.match(grammarRe);
+	if (m && m[1] === GRAMMAR_DIR) {
+		console.log(
+			`${C.dim}languages.toml 已有 promptdown 条目且路径一致，跳过${C.reset}`,
+		);
 		return;
 	}
+	if (m && m[1] !== GRAMMAR_DIR) {
+		const updated = existing.replace(
+			grammarRe,
+			`[[grammar]]\nname = "promptdown"\nsource = { path = "${GRAMMAR_DIR}" }`,
+		);
+		writeFileSync(path, updated);
+		console.log(
+			`${C.green}已更新 source.path → ${GRAMMAR_DIR}${C.reset}`,
+		);
+		return;
+	}
+	// 无 grammar 块：language 已有则只补 grammar，否则 language + grammar 一起追加
+	const hasLanguage = /name\s*=\s*"promptdown"/.test(existing);
 	const block =
 		(existing.trim() ? "\n" : "") +
-		`[[language]]
-name = "promptdown"
-scope = "source.pd"
-file-types = ["pd"]
-comment-tokens = ["//"]
-
-[[grammar]]
-name = "promptdown"
-source = { path = "${GRAMMAR_DIR}" }
-`;
+		(hasLanguage ? "" : `[[language]]\nname = "promptdown"\nscope = "source.pd"\nfile-types = ["pd"]\ncomment-tokens = ["//"]\n\n`) +
+		`[[grammar]]\nname = "promptdown"\nsource = { path = "${GRAMMAR_DIR}" }\n`;
 	writeFileSync(path, existing + block);
 	console.log(`${C.green}已写入 ${path}${C.reset}`);
 }
 
-/** 拷贝 highlights.scm 到 helix runtime（grammar 配置不管 queries，必须手动拷）；并确保 grammars 输出目录存在 */
 function installQueries(configDir) {
-	const dest = join(
-		configDir,
-		"runtime",
-		"queries",
-		LANG_NAME,
-		"highlights.scm",
-	);
-	mkdirSync(join(configDir, "runtime", "queries", LANG_NAME), {
-		recursive: true,
-	});
-	copyFileSync(HIGHLIGHTS, dest);
-	console.log(`${C.green}已安装 queries → ${dest}${C.reset}`);
+	const queryDir = join(configDir, "runtime", "queries", LANG_NAME);
+	mkdirSync(queryDir, { recursive: true });
+	// grammar 配置不管 queries：highlights（高亮）与 indents（auto-indent）都需手动拷
+	for (const name of ["highlights.scm", "indents.scm"]) {
+		const src = join(GRAMMAR_DIR, "queries", name);
+		if (!existsSync(src)) continue; // indents 缺失时仅警告（高亮仍可用）
+		copyFileSync(src, join(queryDir, name));
+		console.log(`${C.green}已安装 queries → ${join(queryDir, name)}${C.reset}`);
+	}
 
 	// hx --grammar build 需要输出目录存在（helix 不会自动创建）
 	mkdirSync(join(configDir, "runtime", "grammars"), { recursive: true });
 }
 
-/** config.toml 工作流建议（只输出，不自动写） */
 function printConfigAdvice() {
 	console.log(
 		`\n${C.bold}可选：写提示词工作流（config.toml 建议，请自行确认后加入 ~/.config/helix/config.toml）${C.reset}` +

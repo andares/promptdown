@@ -16,3 +16,6 @@ tsconfig.json
 pnpm-lock.yaml
 pnpm-workspace.yaml
 !tree-sitter-promptdown/src/
+!scripts/
+scripts/publish.mjs
+scripts/tag-current.mjs

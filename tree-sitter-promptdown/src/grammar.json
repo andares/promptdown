@@ -118,13 +118,48 @@
       ]
     },
     "value": {
+      "type": "PREC_RIGHT",
+      "value": 1,
+      "content": {
+        "type": "REPEAT1",
+        "content": {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "PREC",
+              "value": 2,
+              "content": {
+                "type": "SYMBOL",
+                "name": "ref"
+              }
+            },
+            {
+              "type": "SYMBOL",
+              "name": "text_fragment"
+            }
+          ]
+        }
+      }
+    },
+    "ref": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": ":[^\\s-][^\\s]*"
+        }
+      }
+    },
+    "text_fragment": {
       "type": "TOKEN",
       "content": {
         "type": "PREC",
         "value": 1,
         "content": {
           "type": "PATTERN",
-          "value": "[ \\t]*[^\\n]+"
+          "value": "[ \\t]*[^\\s:][^\\s]*"
         }
       }
     },

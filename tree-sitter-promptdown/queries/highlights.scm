@@ -1,26 +1,17 @@
 ; promptdown (.pd) 高亮捕获（helix / neovim 通用）
-; 行级高亮：section 段标记 / separator 分隔线 / key_value 键值 / item 序列项 /
-; fence_line 围栏行 / text_line 普通文本（不 capture，默认前景）
+; 配色：键 @keyword（紫）、引用 @constant（橙）、分隔线/序列前缀 @operator（蓝）、
+; 段标记 @markup.heading、围栏 @markup.raw.block。
+; 值不加 capture —— 与普通文本同色（pd 的值就是正文，不抢视觉）。
 
 (section) @markup.heading
 
-(separator) @punctuation.special
+(separator) @operator
 
 (key_value
-  key: (key_name) @tag)
+  key: (key_name) @keyword)
 
-(key_value
-  value: (value) @string)
+(ref) @constant
 
-(item
-  (item_dash) @punctuation.special)
-
-(item
-  (key_value
-    key: (key_name) @tag))
-
-(item
-  (key_value
-    value: (value) @string))
+(item_dash) @operator
 
 (fence_line) @markup.raw.block

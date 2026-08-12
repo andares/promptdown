@@ -1,4 +1,4 @@
-# promptdown 新手教程（喂饭版）
+# promptdown 新手教程
 
 > promptdown（`.pd`）是一种极简标记语言：核心符号只有 `:`（键值/引用）和 `-`（序列标记），
 > 兼容 markdown 风格，可以一键转成 JSON。

@@ -247,11 +247,29 @@ code --install-extension promptdown-<version>.vsix
 
 ## 🦀 Helix 支持
 
-helix 语法高亮只用 tree-sitter（无 TextMate），项目附带一份 `tree-sitter-promptdown/` grammar（**helix / neovim 通用**），配一键安装脚本：
+helix 语法高亮只用 tree-sitter（无 TextMate），项目附带一份 `tree-sitter-promptdown/` grammar（**helix / neovim 通用**）。
+
+**一键安装**（repo 或 npm 全局包均可）：
 
 ```bash
-pnpm hx-install   # 检测 hx → 写 languages.toml → 装 queries → hx --grammar build
+pnpm hx-install        # repo 内：检测 hx → 写 languages.toml → 装 queries → hx --grammar build
+hx-install             # npm 全局包（@andares/promptdown）自带此命令，用法相同
 ```
+
+脚本自动：检测 hx → 写/合并 `~/.config/helix/languages.toml`（`source.path` 指向**当前来源**的 grammar——repo 装链 repo，npm 装链包内，来源切换自动更新）→ 拷 queries → `hx --grammar build`。验证：`hx --health promptdown`。
+
+**高亮配色**（`queries/highlights.scm`，值不设色与正文同色）：
+
+| 元素 | 颜色 |
+| --- | --- |
+| 键（含冒号） | 紫 `@keyword` |
+| 引用 `:refname` | 橙 `@constant`（value 内拆分，URL 不误拆） |
+| `---` 分隔线 / `-` 前缀 | 蓝 `@operator` |
+| `//!pd` 段标记 | 标题色粗体 `@markup.heading` |
+| ```` ``` ```` 围栏行 | 代码块底色 `@markup.raw.block` |
+| 值 / 普通文本 | 默认前景（无 capture） |
+
+**缩进继承**（`queries/indents.scm`）：列表项内回车自动缩进到内容列（`- 模块A:` 后新行列 2，嵌套逐级继承）；顶层键值行回车回列 0。helix 无法自动补 `-` 前缀（平台限制，换行只输出空白），回车后手动输入即可。
 
 **写提示词工作流**（config.toml 建议，脚本会输出）：
 
@@ -266,8 +284,8 @@ F6 = ["select_all", "yank"]       # 一键全选复制全文到系统剪贴板�
 
 - `hx 提示词.pd`：`.pd` 后缀自动识别，直接写（不 `:w` 即不落盘）
 - 写完 `F6` 复制全文 → Windows 端 `Ctrl+V` 粘贴（WSLg 与系统剪贴板同步，已实测）
-- 手动安装：`languages.toml` 加 `[[language]]` + `[[grammar]]`（`source.path` 指向 grammar 目录）→ `hx --grammar build` → 拷 `queries/highlights.scm` 到 `~/.config/helix/runtime/queries/promptdown/`（⚠️ grammar 配置不管 queries，必须手动拷）
-- 限制：围栏只高亮 ```` ``` ```` 行本身（无完整围栏结构）；ref 宽松匹配（无前后空格约束）
+- 手动安装：`languages.toml` 加 `[[language]]` + `[[grammar]]`（`source.path` 指向 grammar 目录）→ `hx --grammar build` → 拷 `queries/*.scm` 到 `~/.config/helix/runtime/queries/promptdown/`（⚠️ grammar 配置不管 queries，必须手动拷）
+- 限制：围栏只高亮 ```` ``` ```` 行本身（围栏内行按普通文本）；键名不能以 `-` 开头（`-` 前缀归列表项）
 
 ## 🤖 AI Skill
 

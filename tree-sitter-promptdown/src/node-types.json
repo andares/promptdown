@@ -85,6 +85,25 @@
     }
   },
   {
+    "type": "value",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "ref",
+          "named": true
+        },
+        {
+          "type": "text_fragment",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "fence_line",
     "named": true
   },
@@ -101,6 +120,10 @@
     "named": true
   },
   {
+    "type": "ref",
+    "named": true
+  },
+  {
     "type": "section",
     "named": true
   },
@@ -109,11 +132,11 @@
     "named": true
   },
   {
-    "type": "text_line",
+    "type": "text_fragment",
     "named": true
   },
   {
-    "type": "value",
+    "type": "text_line",
     "named": true
   }
 ]

@@ -35,7 +35,7 @@ words
 (document
   (key_value
     key: (key_name)
-    value: (value))
+    value: (value (text_fragment)))
   (separator)
   (text_line))
 
@@ -51,10 +51,10 @@ url: https://example.com:8443/path
 (document
   (key_value
     key: (key_name)
-    value: (value))
+    value: (value (text_fragment)))
   (key_value
     key: (key_name)
-    value: (value)))
+    value: (value (text_fragment))))
 
 ==================
 键值空值
@@ -69,7 +69,7 @@ url: https://example.com:8443/path
     key: (key_name)))
 
 ==================
-键值值中引用（不拆分，整体 value）
+键值值中引用（ref 拆分高亮）
 ==================
 
 参考: :基础设定 防抖 300ms
@@ -79,7 +79,10 @@ url: https://example.com:8443/path
 (document
   (key_value
     key: (key_name)
-    value: (value)))
+    value: (value
+      (ref)
+      (text_fragment)
+      (text_fragment))))
 
 ==================
 序列项 item 与嵌套键值
@@ -95,7 +98,7 @@ url: https://example.com:8443/path
     (item_dash)
     (key_value
       key: (key_name)
-      value: (value)))
+      value: (value (text_fragment))))
   (item
     (item_dash)
     (item_text)))
@@ -145,4 +148,4 @@ a --- b 中间分隔线不识别
   (text_line)
   (key_value
     key: (key_name)
-    value: (value)))
+    value: (value (text_fragment))))
