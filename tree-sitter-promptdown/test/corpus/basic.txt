@@ -1,0 +1,148 @@
+==================
+段标记 section
+==================
+
+//!pd 基础设定
+
+---
+
+(document
+  (section))
+
+==================
+段标记带缩进与段名
+==================
+
+  //!pd 任务
+后续内容
+
+---
+
+(document
+  (section)
+  (text_line))
+
+==================
+分隔线 separator
+==================
+
+name: value
+---
+words
+
+---
+
+(document
+  (key_value
+    key: (key_name)
+    value: (value))
+  (separator)
+  (text_line))
+
+==================
+键值 key_value（key 含冒号）
+==================
+
+标题: 我的提示词
+url: https://example.com:8443/path
+
+---
+
+(document
+  (key_value
+    key: (key_name)
+    value: (value))
+  (key_value
+    key: (key_name)
+    value: (value)))
+
+==================
+键值空值
+==================
+
+标题:
+
+---
+
+(document
+  (key_value
+    key: (key_name)))
+
+==================
+键值值中引用（不拆分，整体 value）
+==================
+
+参考: :基础设定 防抖 300ms
+
+---
+
+(document
+  (key_value
+    key: (key_name)
+    value: (value)))
+
+==================
+序列项 item 与嵌套键值
+==================
+
+- 目标: 做早餐
+- 简单项
+
+---
+
+(document
+  (item
+    (item_dash)
+    (key_value
+      key: (key_name)
+      value: (value)))
+  (item
+    (item_dash)
+    (item_text)))
+
+==================
+围栏行 fence_line
+==================
+
+```js
+const x = 1;
+```
+
+---
+
+(document
+  (fence_line)
+  (text_line)
+  (fence_line))
+
+==================
+普通文本与歧义压制
+==================
+
+这是普通文本行
+a --- b 中间分隔线不识别
+- 行首减号空格是序列项
+
+---
+
+(document
+  (text_line)
+  (text_line)
+  (item
+    (item_dash)
+    (item_text)))
+
+==================
+文本行之后键值行（跨行 external 状态）
+==================
+
+普通文本
+任务: 内容
+
+---
+
+(document
+  (text_line)
+  (key_value
+    key: (key_name)
+    value: (value)))

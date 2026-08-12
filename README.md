@@ -12,7 +12,7 @@
 [![npm version](https://img.shields.io/npm/v/@andares/promptdown?color=4fc08d&label=npm)](https://www.npmjs.com/package/@andares/promptdown)
 [![license](https://img.shields.io/npm/l/@andares/promptdown?color=orange)](./LICENSE)
 [![vscode](https://img.shields.io/badge/VSCode-Extension-007acc?logo=visualstudiocode&logoColor=white)](https://github.com/andares/promptdown)
-[![AI skill](https://img.shields.io/badge/AI-Skill-8b5cf6)](./skill/SKILL.md)
+[![AI skill](https://img.shields.io/badge/AI-Skill-8b5cf6)](./skill/promptdown/SKILL.md)
 
 </div>
 
@@ -27,6 +27,8 @@
 | 🔗 **嵌套引用** | `:refname` 编译期内联展开，多段 `//!pd <name>` 混排复用 |
 | 🎨 **VSCode 高亮** | TextMate grammar 纯声明式扩展，**无需 LSP**，零红线 |
 | ✨ **自动格式化** | CLI `pdformat` + VSCode 格式化程序，首个/后续冒号判定与顶层缩进一键规范 |
+| ⚡ **编辑器命令** | 命令面板输入 `pd2json` 一键转 JSON（新开 Untitled 不覆盖原文），`-` 列表自动续行 |
+| 🔍 **自动检测** | untitled / 纯文本出现 `//!pd` 段标记即自动切换 pd 语言（高亮 + 格式化，可关） |
 | 🤖 **AI 友好** | 内置 skill：看到 `//!pd` 即按 pd 格式解析 |
 | 📝 **兼容 Markdown** | 内联 `**粗体**`、`` `代码` `` 等保留原文，混输无压力 |
 
@@ -169,7 +171,13 @@ pdformat <file.pd> [-w|--write]   # 默认输出 stdout；-w 写回原文件
 
 ## 🎨 VSCode 扩展
 
-安装 `.vsix` 后，`.pd` 文件自动获得高亮：
+安装 `.vsix` 后，`.pd` 文件自动获得完整的编辑体验——**纯声明式扩展（无 LSP）**，不会产生任何诊断红线：
+
+```bash
+code --install-extension promptdown-<version>.vsix
+```
+
+### 🏷️ 语法高亮
 
 - 🏷️ 段标记 `//!pd <name>`
 - ➖ 分隔线 `---`
@@ -179,13 +187,16 @@ pdformat <file.pd> [-w|--write]   # 默认输出 stdout；-w 写回原文件
 
 扩展详情页、扩展列表和 `.pd` 语言均使用 `icons/pd-icon.png` 作为品牌图标。
 
-纯声明式扩展（无 LSP），不会产生任何诊断红线。
+### 🔍 `//!pd` 自动检测
 
-```bash
-code --install-extension promptdown-<version>.vsix
-```
+在 **untitled / 未知扩展名等弱语法文件**（默认 plaintext，如 `.txt`、`.log`）中，出现 `//!pd` 段标记行时自动切换为 promptdown 语言，立即获得高亮与格式化：
 
-### ✨ 格式化程序（已注册）
+- **打开时**：扫描前 50 行，发现段标记即切换
+- **输入时**：逐键分层预筛（行首 `//` 特征 → 段标记判定，几乎零开销），敲完 `//!pd` 即刻切换
+- 每文档每会话最多切换一次；**不覆盖用户显式选择的语言**（`.md`/`.js` 等有自身语法的文件不受影响）
+- 可用设置关闭：`"promptdown.autoDetect": false`
+
+### ✨ 格式化程序
 
 扩展内置文档格式化程序（`DocumentFormattingEditProvider`）：
 
@@ -194,6 +205,29 @@ code --install-extension promptdown-<version>.vsix
 - 想保存时自动格式化：设置 `"editor.formatOnSave": true`（或仅对 pd：`"[promptdown]": { "editor.formatOnSave": true }`）
 
 格式化规则与 `pdformat` CLI 一致（首个键值冒号、后续全角冒号、`:-` 普通冒号标记、顶层 `-` 缩进和行尾空白）。
+
+### 📦 pd2json 命令
+
+`Ctrl+Shift+P` 打开命令面板，输入 **`pd2json`** 回车，即可把当前 PD 文档解析为 JSON：
+
+- 结果输出到**新开的 untitled JSON 文件**（侧边预览打开），**不会覆盖原文档**
+- 多段文件（多个 `//!pd` 段）会弹出 QuickPick 让你选择要转换的段
+- PD 判断宽松：语言为 promptdown、文件名 `.pd`、或内容含 `//!pd` 段标记均可
+- 无活动编辑器 / 非 PD 文档 / 语法错误都会用 VSCode 通知提示，无副作用
+- **无默认快捷键**（命令面板搜索 `pd2json` 即可调出）
+
+### ⌨️ 列表续行
+
+在 `-` 序列条目行尾按回车，新行自动补上 `-`（保持原行缩进，与 Markdown 习惯一致）：
+
+| 场景 | 行为 |
+| --- | --- |
+| `- foo` 行尾回车 | 新行补 `-`，缩进与原行一致 |
+| `- key: value` 行尾回车 | 同上（带-键值也是序列条目） |
+| `-`（空条目）回车 | 退出列表（新行无标记） |
+| `---`（分隔线）回车 | 不续行 |
+
+> 生效条件：`editor.autoIndent` 开启（默认开启）。
 
 ### 📁 文件图标
 
@@ -205,11 +239,41 @@ code --install-extension promptdown-<version>.vsix
 > 注：VSCode 不允许扩展强制覆盖用户的图标主题，需要在设置里手动切换一次。
 > 因为继承了 Seti，其他文件图标保持不变，只有 `.pd` 显示 `icons/pd-icon.png`。扩展也提供了语言图标回退，但最终是否展示仍由当前文件图标主题决定；选择 `promptdown Icons` 可确保资源管理器与编辑器标签页显示专属图标。
 
+### ⚙️ 设置一览
+
+| 设置 | 默认 | 说明 |
+| --- | --- | --- |
+| `promptdown.autoDetect` | `true` | 弱语法文件（untitled/txt/log 等）中出现 `//!pd` 段标记时，自动切换文档语言为 promptdown（获得高亮与格式化） |
+
+## 🦀 Helix 支持
+
+helix 语法高亮只用 tree-sitter（无 TextMate），项目附带一份 `tree-sitter-promptdown/` grammar（**helix / neovim 通用**），配一键安装脚本：
+
+```bash
+pnpm hx-install   # 检测 hx → 写 languages.toml → 装 queries → hx --grammar build
+```
+
+**写提示词工作流**（config.toml 建议，脚本会输出）：
+
+```toml
+[editor]
+clipboard-provider = "wayland"   # WSLg 默认已自动检测；显式声明更稳
+
+[keys.normal]
+F5 = ":set-language promptdown"   # 一键激活 pd 语言（空 buffer / 未存盘场景）
+F6 = ["select_all", "yank"]       # 一键全选复制全文到系统剪贴板（WSLg → Windows 剪贴板）
+```
+
+- `hx 提示词.pd`：`.pd` 后缀自动识别，直接写（不 `:w` 即不落盘）
+- 写完 `F6` 复制全文 → Windows 端 `Ctrl+V` 粘贴（WSLg 与系统剪贴板同步，已实测）
+- 手动安装：`languages.toml` 加 `[[language]]` + `[[grammar]]`（`source.path` 指向 grammar 目录）→ `hx --grammar build` → 拷 `queries/highlights.scm` 到 `~/.config/helix/runtime/queries/promptdown/`（⚠️ grammar 配置不管 queries，必须手动拷）
+- 限制：围栏只高亮 ```` ``` ```` 行本身（无完整围栏结构）；ref 宽松匹配（无前后空格约束）
+
 ## 🤖 AI Skill
 
 两个 skill，按需安装：
 
-**① 解析版 [`skill/SKILL.md`](skill/SKILL.md)** —— 提供 pd 语法知识（读）：
+**① 解析版 [`skill/promptdown/SKILL.md`](skill/promptdown/SKILL.md)** —— 提供 pd 语法知识（读）：
 
 - 输入中出现 **`//!pd`** → 后续内容按 pd 格式解析
 - 处理 `.pd` 文件、转 JSON、语法纠错
@@ -235,25 +299,25 @@ pnpm package     # 以 --no-dependencies 打包 .vsix
 ### 发布
 
 ```bash
-pnpm release patch        # 只发 npm（0.1.0 → 0.1.1，vsce 有 token 才发）
+pnpm release patch        # 只发 npm + push 分支/打 tag（0.1.0 → 0.1.1）
 pnpm release-all patch    # npm + VSCode 一起发：npm 失败中止，vsce 失败只提示
 pnpm tag-current          # 给当前版本打本地 tag vX.Y.Z（已存在则跳过，不推送）
 pnpm release patch -- --dry-run   # 先预览计划
 ```
 
-一键完成：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → GitHub 推送 + 创建 Release → `vsce package --no-dependencies`。
-设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后自动上传扩展市场；`release-all` 模式下 npm 发布失败即中止（版本已锚定），GitHub 推送/建 Release 与扩展发布均为 best-effort：失败只提示，可稍后手动补发。GitHub Release 需要 `GITHUB_TOKEN`（fine-grained token，Contents: write）。
+- `pnpm release`：门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `git push origin <分支> --tags`。**不做 vsce、不创建 GitHub Release**
+- `pnpm release-all`：在 release 基础上再推 GitHub 并创建 Release，`vsce package --no-dependencies` 后自动发布扩展。设置 `VSCE_PAT`（vsce 官方环境变量，在 Azure DevOps 创建 PAT）后自动上传扩展市场；npm 发布失败即中止（版本已锚定），GitHub 推送/建 Release 与扩展发布均为 best-effort：失败只提示，可稍后手动补发。GitHub Release 需要 `GITHUB_TOKEN`（fine-grained token，Contents: write）。
 
 ## 📁 项目结构
 
-```
+```text
 promptdown/
 ├── icons/pd-icon.png   # 扩展品牌图标 + .pd 文件图标
 ├── src/parser/          # 语法引擎（lexer → parser → toJson → expand）
 ├── src/cli.ts           # pd2json CLI
 ├── syntaxes/            # TextMate 语法高亮
 ├── docs/SPEC.md         # ⭐ 语法规范（唯一事实来源）
-├── skill/SKILL.md       # AI skill
+├── skill/               # AI skill（容器：promptdown/ 解析版 + pd-author/ 作者版）
 └── test/fixtures/       # 测试基准（含全部用户范例）
 ```
 

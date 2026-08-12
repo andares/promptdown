@@ -1,0 +1,26 @@
+{
+  "name": "tree-sitter-promptdown",
+  "description": "promptdown (.pd) grammar for tree-sitter — used by helix and neovim",
+  "grammars": [
+    {
+      "language": "promptdown",
+      "scope": "source.pd",
+      "file-types": [
+        "pd"
+      ],
+      "name": "promptdown"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "authors": [
+      {
+        "name": "andares"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/andares/promptdown"
+    }
+  }
+}

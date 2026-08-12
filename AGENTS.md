@@ -42,7 +42,7 @@ src/
 ```
 
 **`docs/SPEC.md` 是语法规范的唯一事实来源**——grammar、parser、skill 全部以它为准。
-`skill/SKILL.md` 是语法速查（供 AI 加载），与 SPEC 冲突时以 SPEC 为准。
+`skill/promptdown/SKILL.md` 是语法速查（供 AI 加载），与 SPEC 冲突时以 SPEC 为准。
 
 ## pd 语法要点（避免误解）
 
@@ -59,10 +59,10 @@ src/
 
 ## Release Flow（`pnpm release` / `pnpm release-all`）
 
-两种模式共用基础流程（门禁 → bump → commit+tag → pnpm publish → vsce package → vsce publish），差异：
+两种模式共用基础流程（门禁 → bump → commit+tag → pnpm publish → push 分支+tags），差异：
 
-- `release`：**不做 GitHub 步骤**；有 vsce 凭据（`VSCE_PAT` 或 `~/.vsce`）才发布扩展，失败警告；否则跳过
-- `release-all`：**npm 铁定发**（失败即中止，版本已锚定）；npm 成功后**推 GitHub 并建 Release**（best-effort）；vsce publish 必走，无 vsce 凭据或失败时**降级为只发 npm**（提示，不中止，可稍后手动补发）
+- `release`：**只发 npm**：门禁 → bump → commit+tag → pnpm publish → `git push origin <当前分支> --tags`（best-effort，失败仅警告）。**不做 vsce package/publish，不创建 GitHub Release**
+- `release-all`：**npm 铁定发**（失败即中止，版本已锚定）；npm 成功后**推 GitHub 并建 Release**（best-effort）；vsce package + publish 必走，无 vsce 凭据或失败时**降级为只发 npm**（提示，不中止，可稍后手动补发）
 
 1. 参数校验：`patch | minor | major` 恰好一个；`--dry-run` 只预览
 2. dirty tree 警告（不阻塞）
@@ -70,9 +70,9 @@ src/
 4. bump `package.json` version（2 空格缩进 + 尾换行）
 5. `git commit -m "chore: release vX.Y.Z"`，然后调用 `scripts/tag-current.mjs` 打 tag（检测已存在 → 不重复打，指向 release commit）
 6. `pnpm publish --no-git-checks --access=public`（prepublishOnly 再次门禁 typecheck+test+build；失败中止，回滚见下）
-7. **[release-all]** `git push origin <当前分支> --tags`（尝试一次，失败仅警告——可能此前已推过）；然后设了 `GITHUB_TOKEN`（fine-grained，Contents: write）就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；未设 token / 其他失败 → 仅警告）
-8. `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`
-9. 若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据（`pnpm exec vsce login andares` 存的明文文件——本机 keytar 原生模块未编译，vsce 自动降级为文件存储），自动 `vsce publish`；否则提示手动补发
+7. `git push origin <当前分支> --tags`（两种模式都做，尝试一次，失败仅警告——可能此前已推过）
+8. **[release-all]** 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；未设 token / 其他失败 → 仅警告）
+9. **[release-all]** `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`；若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据（`pnpm exec vsce login andares` 存的明文文件——本机 keytar 原生模块未编译，vsce 自动降级为文件存储），自动 `vsce publish`；否则提示手动补发
 
 `pnpm tag-current` 可独立使用：给当前 HEAD 打本地 `v{version}` tag（已存在则跳过），**只打 tag 不推送**。
 
@@ -87,7 +87,7 @@ src/
 - 内联 markdown（`**粗体**`、`` `代码` ``）转 JSON 时**保留原文**，不做内联解析
 - 数组元素一行一个，无逗号分隔
 - 测试用 node:test + fixtures（`test/fixtures/*.pd`），新增语法规则必须补 fixtures + 断言
-- 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/SKILL.md` → fixtures
+- 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/promptdown/SKILL.md` → fixtures
 - 格式化规则（src/format.ts）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
 - **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
 - 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release` / `pnpm release-all`

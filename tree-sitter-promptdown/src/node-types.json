@@ -1,0 +1,119 @@
+[
+  {
+    "type": "document",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "fence_line",
+          "named": true
+        },
+        {
+          "type": "item",
+          "named": true
+        },
+        {
+          "type": "key_value",
+          "named": true
+        },
+        {
+          "type": "section",
+          "named": true
+        },
+        {
+          "type": "separator",
+          "named": true
+        },
+        {
+          "type": "text_line",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "item",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "item_dash",
+          "named": true
+        },
+        {
+          "type": "item_text",
+          "named": true
+        },
+        {
+          "type": "key_value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "key_value",
+    "named": true,
+    "fields": {
+      "key": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "key_name",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "value",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "fence_line",
+    "named": true
+  },
+  {
+    "type": "item_dash",
+    "named": true
+  },
+  {
+    "type": "item_text",
+    "named": true
+  },
+  {
+    "type": "key_name",
+    "named": true
+  },
+  {
+    "type": "section",
+    "named": true
+  },
+  {
+    "type": "separator",
+    "named": true
+  },
+  {
+    "type": "text_line",
+    "named": true
+  },
+  {
+    "type": "value",
+    "named": true
+  }
+]

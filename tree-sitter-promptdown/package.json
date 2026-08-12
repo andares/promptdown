@@ -1,0 +1,16 @@
+{
+  "name": "tree-sitter-promptdown",
+  "version": "0.1.0",
+  "description": "promptdown (.pd) grammar for tree-sitter — used by helix (and neovim)",
+  "main": "bindings/node",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.pd",
+      "file-types": ["pd"]
+    }
+  ]
+}

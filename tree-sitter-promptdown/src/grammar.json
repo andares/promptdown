@@ -1,0 +1,206 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
+  "name": "promptdown",
+  "rules": {
+    "document": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_lines"
+        },
+        {
+          "type": "BLANK"
+        }
+      ]
+    },
+    "_lines": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_line"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_lines"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "_line": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "PREC",
+          "value": 2,
+          "content": {
+            "type": "SYMBOL",
+            "name": "key_value"
+          }
+        },
+        {
+          "type": "PREC",
+          "value": 2,
+          "content": {
+            "type": "SYMBOL",
+            "name": "item"
+          }
+        },
+        {
+          "type": "PREC",
+          "value": 2,
+          "content": {
+            "type": "SYMBOL",
+            "name": "section"
+          }
+        },
+        {
+          "type": "PREC",
+          "value": 2,
+          "content": {
+            "type": "SYMBOL",
+            "name": "separator"
+          }
+        },
+        {
+          "type": "PREC",
+          "value": 2,
+          "content": {
+            "type": "SYMBOL",
+            "name": "fence_line"
+          }
+        },
+        {
+          "type": "PREC",
+          "value": 1,
+          "content": {
+            "type": "SYMBOL",
+            "name": "text_line"
+          }
+        }
+      ]
+    },
+    "key_value": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "key",
+          "content": {
+            "type": "SYMBOL",
+            "name": "key_name"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "value",
+              "content": {
+                "type": "SYMBOL",
+                "name": "value"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "value": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 1,
+        "content": {
+          "type": "PATTERN",
+          "value": "[ \\t]*[^\\n]+"
+        }
+      }
+    },
+    "item": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "item_dash"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "PREC",
+              "value": 1,
+              "content": {
+                "type": "SYMBOL",
+                "name": "key_value"
+              }
+            },
+            {
+              "type": "SYMBOL",
+              "name": "item_text"
+            }
+          ]
+        }
+      ]
+    },
+    "item_text": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 1,
+        "content": {
+          "type": "PATTERN",
+          "value": "[^\\n]+"
+        }
+      }
+    }
+  },
+  "extras": [
+    {
+      "type": "PATTERN",
+      "value": "\\s"
+    }
+  ],
+  "conflicts": [],
+  "precedences": [],
+  "externals": [
+    {
+      "type": "SYMBOL",
+      "name": "section"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "separator"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "fence_line"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "key_name"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "item_dash"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "text_line"
+    }
+  ],
+  "inline": [],
+  "supertypes": [],
+  "reserved": {}
+}

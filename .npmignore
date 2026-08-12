@@ -8,8 +8,11 @@ tmp/
 *.tgz
 .git/
 PLAN.md
+plans/
+.firecrawl/
 tsconfig.json
 .vscodeignore
 .npmignore
 pnpm-lock.yaml
 pnpm-workspace.yaml
+!tree-sitter-promptdown/src/

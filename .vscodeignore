@@ -17,7 +17,10 @@ tsconfig.json
 *.vsix
 *.tgz
 PLAN.md
+plans/
+.firecrawl/
 .npmignore
 .gitignore
 pnpm-lock.yaml
 pnpm-workspace.yaml
+tree-sitter-promptdown/

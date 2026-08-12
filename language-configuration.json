@@ -17,5 +17,15 @@
     { "open": "{", "close": "}" },
     { "open": "**", "close": "**" },
     { "open": "`", "close": "`" }
+  ],
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*-\\s*$",
+      "action": { "indent": "none", "appendText": "" }
+    },
+    {
+      "beforeText": "^\\s*-\\s+.*$",
+      "action": { "indent": "none", "appendText": "- " }
+    }
   ]
 }

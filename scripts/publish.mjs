@@ -2,16 +2,17 @@
 /**
  * One-command release for promptdown（pnpm 包 + VSCode 扩展）。
  *
- *   pnpm release patch            # npm 发布：0.1.0 → 0.1.1（vsce 可选）
+ *   pnpm release patch            # npm 发布 + 打 tag 并推送：0.1.0 → 0.1.1
  *   pnpm release-all patch        # npm + VSCode 一起发：npm 失败中止，vsce 失败降级为只发 npm
  *
  * 模式：
  * - release：门禁 → bump(major|minor|patch) → commit+tag → pnpm publish（失败中止）
- *   → vsce package；设置了 VSCE_PAT 才 vsce publish（失败警告）
+ *   → git push origin <当前分支> --tags（best-effort，失败仅警告）。
+ *   不做 vsce package/publish，也不创建 GitHub Release。
  * - release-all：同 release，但 npm 铁定发（失败即中止，版本已锚定）；
  *   npm 成功后尝试推 GitHub（分支 + tags，失败仅警告——可能此前已推过），
  *   并用 GITHUB_TOKEN 创建 GitHub Release v{next}（best-effort：未设 token /
- *   已存在 / 失败都只提示、不中止）；随后 vsce publish 必走——vsce 凭据
+ *   已存在 / 失败都只提示、不中止）；随后 vsce package + publish 必走——vsce 凭据
  *   （VSCE_PAT 环境变量或 `vsce login` 存的 ~/.vsce 文件）缺失或发布失败时
  *   降级：只提示、不中止，结果 = 仅 npm 已发布（可稍后手动补发扩展）。
  *
@@ -56,7 +57,7 @@ const arg = mode === "all" ? positional[1] : positional[0];
 if (mode === "release" && !BUMPS.includes(arg)) {
 	console.error(
 		`${C.red}${C.bold}Usage: pnpm release <${BUMPS.join("|")}>${C.reset}` +
-			`\n  Bump the package version and publish npm (exactly one argument).` +
+			`\n  Bump the package version, publish npm, then push branch + tags (exactly one argument).` +
 			`\n  Add --dry-run to preview without changing anything.`,
 	);
 	process.exit(1);
@@ -177,35 +178,27 @@ if (dryRun) {
 	console.log(
 		`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`,
 	);
+	console.log(`  5. git push origin ${branch} --tags（best-effort）`);
 	if (mode === "all") {
 		console.log(
-			`  5. git push origin ${branch} --tags + GitHub Release v${next}` +
+			`  6. 创建 GitHub Release v${next}` +
 				(process.env.GITHUB_TOKEN
 					? ""
-					: `（未设置 GITHUB_TOKEN → 仅 push，Release 跳过）`),
+					: `（未设置 GITHUB_TOKEN → 跳过 Release）`),
 		);
-	} else {
-		console.log(`  5. （release 模式不做 GitHub 步骤）`);
-	}
-	console.log(
-		`  6. pnpm exec vsce package --no-dependencies → promptdown-${next}.vsix`,
-	);
-	if (mode === "all") {
+		console.log(
+			`  7. pnpm exec vsce package --no-dependencies → promptdown-${next}.vsix`,
+		);
 		console.log(
 			vsceCred
-				? `  7. pnpm exec vsce publish（release-all 必走，检测到凭据）`
-				: `  7. pnpm exec vsce publish（release-all 必走，但无 vsce 凭据 → 仅提示）`,
+				? `  8. pnpm exec vsce publish（release-all 必走，检测到凭据）`
+				: `  8. pnpm exec vsce publish（release-all 必走，但无 vsce 凭据 → 仅提示）`,
 		);
 	} else {
-		console.log(
-			vsceCred
-				? `  7. pnpm exec vsce publish（检测到凭据）`
-				: `  7. pnpm exec vsce publish（跳过：无 vsce 凭据）`,
-		);
+		console.log(`     （release 模式：无 vsce / GitHub Release 步骤）`);
 	}
 	process.exit(0);
 }
-
 // Dirty-tree warning (non-blocking; publish uses --no-git-checks).
 const dirty = run(git, ["status", "--porcelain"], { stdio: "pipe" })
 	.stdout.toString()
@@ -259,11 +252,10 @@ if (publish.status !== 0) {
 	process.exit(publish.status ?? 1);
 }
 
-// 5. GitHub：push 分支 + tags（尝试一次，失败仅警告——可能此前已推过；
-// 确保 tag 在远端存在后再建 Release，否则 API 会自动建 tag 指向默认分支
-// 的 HEAD，可能不是 release commit）。然后创建 GitHub Release v${next}
-// （best-effort：未设 token / 已存在 / 失败都只提示，不中止）。
-step("git push + GitHub Release");
+// 5. push 分支 + tags（两种模式都做；失败仅警告——可能此前已推过）。
+//    release-all 额外创建 GitHub Release v${next}（best-effort：
+//    未设 token / 已存在 / 失败都只提示，不中止）。
+step("git push（分支 + tags）");
 const push = run(git, ["push", "origin", branch, "--tags"], {
 	allowFailure: true,
 });
@@ -273,86 +265,90 @@ if (push.status !== 0) {
 			`若远端还没有 tag v${next}，Release 将无法指向 release commit。${C.reset}`,
 	);
 }
-if (!process.env.GITHUB_TOKEN) {
-	console.warn(
-		`${C.yellow}未设置 GITHUB_TOKEN — 跳过 GitHub Release 创建。` +
-			`npm 已发布 v${next}，可稍后手动创建 release。${C.reset}`,
-	);
-} else {
-	const rel = run(
-		curl,
-		[
-			"-sS",
-			"-X",
-			"POST",
-			"-H",
-			"Accept: application/vnd.github+json",
-			"-H",
-			"X-GitHub-Api-Version: 2022-11-28",
-			"-H",
-			`Authorization: Bearer ${process.env.GITHUB_TOKEN}`,
-			"-w",
-			"\n%{http_code}",
-			"-d",
-			JSON.stringify({
-				tag_name: `v${next}`,
-				name: `v${next}`,
-				generate_release_notes: true,
-			}),
-			`https://api.github.com/repos/${ghRepo}/releases`,
-		],
-		{ allowFailure: true, stdio: "pipe" },
-	);
-	const lines = rel.stdout.toString().trimEnd().split("\n");
-	const code = lines.pop()?.trim() ?? "";
-	if (rel.status === 0 && code === "201") {
-		console.log(`${C.green}GitHub Release v${next} 创建成功${C.reset}`);
+if (mode === "all") {
+	if (!process.env.GITHUB_TOKEN) {
+		console.warn(
+			`${C.yellow}未设置 GITHUB_TOKEN — 跳过 GitHub Release 创建。` +
+				`npm 已发布 v${next}，可稍后手动创建 release。${C.reset}`,
+		);
 	} else {
-		// POST 失败后查询确认——release 可能已存在（并发/重试/手动补建），
-		// 幂等处理：查询返回 200 即视为成功，不再重复创建。
-		const chk = run(
+		const rel = run(
 			curl,
 			[
 				"-sS",
-				"-o",
-				"/dev/null",
-				"-w",
-				"%{http_code}",
+				"-X",
+				"POST",
+				"-H",
+				"Accept: application/vnd.github+json",
+				"-H",
+				"X-GitHub-Api-Version: 2022-11-28",
 				"-H",
 				`Authorization: Bearer ${process.env.GITHUB_TOKEN}`,
-				`https://api.github.com/repos/${ghRepo}/releases/tags/v${next}`,
+				"-w",
+				"\n%{http_code}",
+				"-d",
+				JSON.stringify({
+					tag_name: `v${next}`,
+					name: `v${next}`,
+					generate_release_notes: true,
+				}),
+				`https://api.github.com/repos/${ghRepo}/releases`,
 			],
 			{ allowFailure: true, stdio: "pipe" },
 		);
-		const chkCode = chk.stdout.toString().trim();
-		if (chkCode === "200") {
-			console.warn(
-				`${C.yellow}POST 返回 HTTP ${code || "?"}，但查询确认 Release v${next} 已存在，跳过（不重复创建）${C.reset}`,
-			);
+		const lines = rel.stdout.toString().trimEnd().split("\n");
+		const code = lines.pop()?.trim() ?? "";
+		if (rel.status === 0 && code === "201") {
+			console.log(`${C.green}GitHub Release v${next} 创建成功${C.reset}`);
 		} else {
-			console.warn(
-				`${C.yellow}GitHub Release 创建失败（POST HTTP ${code || "?"}，按 tag 查询 ${chkCode || "?"}）。` +
-					`npm 已发布 v${next}，可稍后手动创建。${C.reset}`,
+			// POST 失败后查询确认——release 可能已存在（并发/重试/手动补建），
+			// 幂等处理：查询返回 200 即视为成功，不再重复创建。
+			const chk = run(
+				curl,
+				[
+					"-sS",
+					"-o",
+					"/dev/null",
+					"-w",
+					"%{http_code}",
+					"-H",
+					`Authorization: Bearer ${process.env.GITHUB_TOKEN}`,
+					`https://api.github.com/repos/${ghRepo}/releases/tags/v${next}`,
+				],
+				{ allowFailure: true, stdio: "pipe" },
 			);
+			const chkCode = chk.stdout.toString().trim();
+			if (chkCode === "200") {
+				console.warn(
+					`${C.yellow}POST 返回 HTTP ${code || "?"}，但查询确认 Release v${next} 已存在，跳过（不重复创建）${C.reset}`,
+				);
+			} else {
+				console.warn(
+					`${C.yellow}GitHub Release 创建失败（POST HTTP ${code || "?"}，按 tag 查询 ${chkCode || "?"}）。` +
+						`npm 已发布 v${next}，可稍后手动创建。${C.reset}`,
+				);
+			}
 		}
 	}
 }
 
-// 6. Package VSCode extension (.vsix).
-step("pnpm exec vsce package --no-dependencies");
-const vsce = run(pnpm, ["exec", "vsce", "package", "--no-dependencies"], {
-	allowFailure: true,
-});
-if (vsce.status !== 0) {
-	console.warn(
-		`${C.yellow}vsce package failed — pnpm 已发布，但 .vsix 未生成。` +
-			`\n  可手动运行: pnpm exec vsce package --no-dependencies${C.reset}`,
-	);
-} else {
-	console.log(`${C.dim}vsix: ${ROOT}/promptdown-${next}.vsix${C.reset}`);
+// 6. Package VSCode extension (.vsix).（仅 release-all）
+if (mode === "all") {
+	step("pnpm exec vsce package --no-dependencies");
+	const vsce = run(pnpm, ["exec", "vsce", "package", "--no-dependencies"], {
+		allowFailure: true,
+	});
+	if (vsce.status !== 0) {
+		console.warn(
+			`${C.yellow}vsce package failed — pnpm 已发布，但 .vsix 未生成。` +
+				`\n  可手动运行: pnpm exec vsce package --no-dependencies${C.reset}`,
+		);
+	} else {
+		console.log(`${C.dim}vsix: ${ROOT}/promptdown-${next}.vsix${C.reset}`);
+	}
 }
 
-// 7. Publish to the VSCode Marketplace.
+// 7. Publish to the VSCode Marketplace.（仅 release-all）
 if (mode === "all") {
 	step("pnpm exec vsce publish");
 	if (!vsceCred) {
@@ -373,23 +369,11 @@ if (mode === "all") {
 			);
 		}
 	}
-} else if (vsceCred) {
-	step("pnpm exec vsce publish");
-	const vp = run(
-		pnpm,
-		["exec", "vsce", "publish", "--skip-duplicate", "--no-dependencies"],
-		{ allowFailure: true },
-	);
-	if (vp.status !== 0) {
-		console.warn(
-			`${C.yellow}vsce publish failed — pnpm 包已发布，扩展需手动上传 .vsix。${C.reset}`,
-		);
-	}
 }
 
 console.log(
 	`\n${C.green}${C.bold}✅ Released v${current} → v${next}${C.reset}` +
-		`\n${C.dim}Tag: v${next} · commit: chore: release v${next} · pnpm + vsix` +
-		(mode === "all" ? ` · GitHub Release` : ``) +
+		`\n${C.dim}Tag: v${next} · commit: chore: release v${next} · pnpm` +
+		(mode === "all" ? ` + vsix + GitHub Release` : ``) +
 		`${C.reset}`,
 );

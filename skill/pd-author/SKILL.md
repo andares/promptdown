@@ -12,8 +12,8 @@ description: >-
 
 # promptdown 作者指南（写提示词用它，而不是 markdown）
 
-> 解析视角（遇到 `//!pd` 怎么读、怎么转 JSON）见同级 `pd-author` 的兄弟 skill `../SKILL.md`（或 `skill/SKILL.md`）。
-> 完整规范：`../docs/SPEC.md`（唯一事实来源）；喂饭教程：`../docs/TUTORIAL.md`。
+> 解析视角（遇到 `//!pd` 怎么读、怎么转 JSON）见兄弟 skill `../promptdown/SKILL.md`。
+> 完整规范：`../../docs/SPEC.md`（唯一事实来源）；喂饭教程：`../../docs/TUTORIAL.md`。
 
 ## 何时用 pd，何时用 markdown
 
