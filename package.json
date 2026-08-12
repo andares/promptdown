@@ -2,7 +2,7 @@
   "name": "promptdown",
   "displayName": "promptdown",
   "description": "极简标记语言 promptdown（.pd）：兼容 markdown 风格，可转 JSON，提供 VSCode 语法高亮与 pd2json CLI",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "andares",
   "license": "MIT",
   "icon": "icons/pd-icon.png",
@@ -10,7 +10,8 @@
   "activationEvents": [
     "onLanguage:promptdown",
     "onDidOpenTextDocument",
-    "onDidChangeTextDocument"
+    "onDidChangeTextDocument",
+    "onCommand:promptdown.pd2json"
   ],
   "repository": {
     "type": "git",
@@ -35,6 +36,12 @@
     "pdformat": "./dist/format-cli.js"
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "promptdown.pd2json",
+        "title": "pd2json: 将当前 PD 文档解析为 JSON（新开 Untitled 文件）"
+      }
+    ],
     "languages": [
       {
         "id": "promptdown",
@@ -111,7 +118,8 @@
     "release-all": "node ./scripts/publish.mjs all",
     "tag-current": "node ./scripts/tag-current.mjs",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
-    "wsl-install": "node ./scripts/wsl-install.mjs"
+    "wsl-install": "node ./scripts/wsl-install.mjs",
+    "hx-install": "node ./scripts/hx-install.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
