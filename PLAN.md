@@ -1,238 +1,74 @@
-# promptdown 项目初始化规划
+# 修复：Tab 缩进后光标跑到 `-` 左边
 
 ## Context
 
-设计极简标记语言 **promptdown（.pd）**：
+用户报告：序列项行按 Tab 缩进后，**光标移动到了 `-` 的左边**，后续输入会把文字插到 `-` 之前，破坏列表结构，"完全没法使用"。
 
-- 极简，兼容 markdown 风格（不追求完全规范）
-- 支持转 JSON（单向，不做反转）
-- VSCode 语法高亮（TextMate grammar，不需要 LSP）
-- 转 JSON 的 CLI 工具（`pd2json`，支持嵌套引用内联展开）
-- pi skill 便于 AI 理解语法（skill/ 独立目录）
-- 技术栈：TypeScript 单包（VSCode 扩展 + CLI 合一个 package.json）
-- 仓库已建：`/home/andares/repos/andares/promptdown`（git 已初始化，MIT，remote 已配）
+**根因**（`src/extension.ts` 的 `indentLines`）：
 
-## 语法设计（用户确认版）
+当前实现用**整行替换**完成缩进+规范化：
 
-### 行类型
-
-| 行形态 | 语义 |
-| --- | --- |
-| `//!pd <name>` | **pd 段标记**（可省略）：① 提示词中混输时声明 pd 内容开始；② 多段 pd 混排实现引用。纯 pd 文本/文件可省略 |
-| `---` | 分隔线：块边界，指针移回根（清掉之前所有父级） |
-| `key: content?` | 裸键值：**在根对象创建键**（隐式回根），不找爸爸，自己独立成父亲 |
-| `- key: content?` | 带 `-` 键值：**按缩进找爸爸**创建子键；找不到爸爸又是顶层 → 自己进 Subject |
-| `- content` | 带 `-` 内容行：按缩进找爸爸，压入该块的 Info 数组 |
-| `content` | 裸内容行：按缩进找爸爸，压入该块的 Info 数组 |
-| ` :refname ` | 引用标记（`:` 第二种用法）：前后必须带空格，冒号后紧贴引用名；**编译期内联展开** |
-
-### 核心规则（用户确认）
-
-- **键值内容判定（折叠规则）**：
-  - 键内只有**单条字串**（同行内容、无续行、无子键）→ 直接 `"key": "value"`（字符串叶子值）
-  - 键内是**多行字串**或**键值/字串混排** → 套对象：`"key": { "Info1": [...] }`
-  - **Info 的存在意义**：解决多行内容、键值与字串混排时，把无 key 字串记在对象里的问题
-- **无 key 的内容 → 默认键 `Info`，值是数组**：连续无 key 的行压入同一数组；中间出现键值分隔 → 编号自增（Info1 → Info2），顺序保持
-- **顶层匿名对象根叫 `Subject`**（后面跟数字 Subject1/Subject2...）：无 key 内容出现在根层级（尤其 `---` 清掉父级后忘写顶层键值）时，内容进 Subject。区分：Subject = 顶层匿名对象容器；Info = 块内匿名数组
-- **裸键值行不找爸爸**（根下不带 `-` → 自己独立成父亲）；**带 `-` 的键值行死活找爸爸**（嵌套），找不到爸爸又是顶层 → 自己进 Subject
-- **内容行（裸或带 `-`）都按缩进找爸爸**
-- **顶层 `-` 不允许缩进**：缩进算语法错误，可不解析（忽略该行）
-- 没有 `---` 时，空多少行都不算数，内容继续找爸爸
-- **`-` 可选**：单层结构下裸行 = 数组项；`-` 在多层嵌套时明确层级
-- **可以无限嵌套**（靠 `- key:` 链）
-- 内联 markdown（`**粗体**`、`` `代码` ``）转 JSON 时**保留原文**
-- 数组元素一行一个，无逗号分隔
-
-### 缩进规则（用户确认）
-
-**所有行（除裸键值行）严格按缩进找爸爸**：
-
-```pd
-- name:
-- words
+```ts
+edit.replace(new vscode.Range(line, 0, line, text.length), unit + body);
 ```
 
-`- words` 与 `- name:` 缩进相同 → 平级 → words 进 name 的爸爸的 Info；**要进入 name 必须更深缩进**。
+VSCode 编辑调整规则：光标位于被替换范围内时，会被挪到替换区**起点**（行首 col 0）。随后的 `.then()` 又按 `origCols[i]`（**缩进前的绝对列号**）把光标拉回去——但行内容已经整体右移了一个缩进单位，绝对列号不再对应原来的文本位置：
 
-块栈模型（爸爸 = 栈中最近一个基准缩进 < 行缩进的块；同时弹出基准 ≥ 行缩进的块）：
+- 典型场景：新续的 `-`（光标在 col 2）按 Tab → 行变 ` - `（`-` 在 col 4），光标被还原到 col 2 = **`-` 左边**，输入即破坏条目
+- 行尾输入场景同理：`- foo` 光标在行尾 col 5，缩进后光标落在 `- foo` 的 col 5（`-` 右侧空格处），无法继续在行尾输入
 
-- 根对象：基准缩进 -∞
-- 裸键值块（`key:` 创建）：基准 -∞
-- Subject 块（顶层匿名对象，键名 SubjectN）：基准 -∞
-- 带 `-` 块（`- key:` 创建）：基准 = 行缩进
+## Approach
 
-### 引用规则（用户确认）
+**不再整行替换，改为每行两个互不重叠的 TextEdit，一次 `editor.edit()` 完成**：
 
-- `:refname` 引用的内容若是**没有任何语法标记的纯文字** → 内联嵌入，**保留前后空格**（inline 形态）
-- 引用的内容**带语法标记**（键值/序列等）→ 引用独立成行；该段按 `:refname` 位置前后断开，全部转为 `-` 开头的序列项
-- **编译期内联展开**：不存在中间占位；v1 实现展开。被引用段内容作为块内联进引用位置，前后文本断开为独立 `-` 项
-- **解析必须指定段名**：`//!pd a2` 里的 `:a1` 引用 a1 段；CLI 需指定转换哪个段
+1. `insert` 缩进单位到 `(line, 0)`（行首）
+2. `replace` 把 `-` 后的空白段 `[start, end)` 替换为单个半角空格（仅当需要规范化时）
 
-### 用户范例（测试基准）
+**为什么能修好光标**：VSCode 对"插入点位于光标之前"的编辑，会自动把光标**右移 unit 长度**（跟随文本）；光标恰好在插入点（col 0）时不受影响（保持 col 0）。这正是原生 `editor.action.indentLines` 的光标语义——零恢复代码，`.then()`/`origCols`/`editor.selections =` 全部删除。
 
-范例 1（平级键 + 嵌套 + 无 key 归 Info + 单条折叠）：
+光标行为矩阵（unit=4）：
 
-```pd
-name1:
-- some
-- name2: other words
-- name3:
-  - more
-  - words
-words
-```
+| 场景 | 缩进前 | 缩进后 | 光标 |
+| --- | --- | --- | --- |
+| 续行后直接 Tab | `-`（col 2） | ` - ` | col 6（行尾，可继续输入）✅ |
+| 行尾输入中 Tab | `- foo`（col 5） | `- foo` | col 9（行尾）✅ |
+| 行首 col 0 Tab | `- foo`（col 0） | `- foo` | col 0（保持，连续 Tab 可嵌套）✅ |
+| 多空白收拢 | `-   x`（col 5） | `- x` | col 7（行尾）✅ |
+| 裸 `-` | `-`（col 1） | ` - ` | col 6（行尾）✅ |
+| `-foo`（只缩进不规范化） | col 4 | `-foo` | col 8（行尾）✅ |
 
-```json
-{
-  "name1": {
-    "Info1": ["some"],
-    "name2": "other words",
-    "name3": { "Info1": ["more", "words"] },
-    "Info2": ["words"]
+## Files to modify
+
+- **`src/extension.ts`**：重写 `indentLines`（两段式 edit，删掉 `.then()` 光标还原）；import 从 `normalizeListItem` 换成 `listItemWsRun`；行集合用 `new Set(lines)` 去重（防同一行重复编辑报 "overlapping edits"）
+- **`src/tab.ts`**：把整串变换的 `normalizeListItem` 替换为返回空白段列区间的 `listItemWsRun(line)`（extension.ts 需要精确 Range 才能做小范围 replace）：
+
+  ```ts
+  export interface ListItemWsRun {
+      dash: number;       // `-` 所在列
+      start: number;      // 空白段起点（`-` 后一列）
+      end: number;        // 空白段终点（含）；start === end 表示无空白
+      normalize: boolean; // 需把 [start, end) 替换为单个半角空格
   }
-}
-```
+  ```
 
-范例 2（无 key 开头 → Subject）：
+  判定矩阵：`- foo`→normalize=false（已是单空格）；裸 `-`→true；`-   x`/`-\tx`→true；`-foo`/`---`→false（`-` 后直接跟内容）；非序列项行→null
+- **`test/tab.test.ts`**：`normalizeListItem` 测试换成 `listItemWsRun` 区间+flag 断言（覆盖上表矩阵）；`isListItemLine`、`tabUnit` 测试不变
 
-```pd
-- some
-- name2: other words
-- name3:
-  - more
-  - words
-words
-```
+## Reuse
 
-```json
-{
-  "Subject1": {
-    "Info1": ["some"],
-    "name2": "other words",
-    "name3": { "Info1": ["more", "words"] },
-    "Info2": ["words"]
-  }
-}
-```
+- `isListItemLine`（`src/tab.ts`）— 分支 ② 判定与规范化门控，不动
+- `tabUnit`（`src/tab.ts`）— 缩进单位，不动
+- `LIST_ITEM_RE` — `listItemWsRun` 沿用同构正则 `^([\s]*)-([\s]*)(.*)$`
 
-范例 3（`---` 清父级 + Subject 续 + 裸键值独立成父亲 + 带-键值进 Subject）：
+## Steps
 
-```pd
-no man
-can
-kill: me
----
-nobody
-- like: you
-```
+- [ ] `src/tab.ts`：`normalizeListItem` → `listItemWsRun`（含类型导出与注释更新）
+- [ ] `src/extension.ts`：`indentLines` 改为「行首 insert unit + 空白段 replace 单空格」，删除 `.then()` 光标还原；更新 import；`lines` 去重
+- [ ] `test/tab.test.ts`：新增 `listItemWsRun` 测试组，删 `normalizeListItem` 测试组
+- [ ] 门禁：`pnpm typecheck && pnpm test && pnpm build`
 
-```json
-{
-  "Subject1": { "Info1": ["no man", "can"] },
-  "kill": "me",
-  "Subject2": { "Info1": ["nobody"], "like": "you" }
-}
-```
+## Verification
 
-范例 4（多段 + 引用内联展开）：
-
-```pd
-//!pd a1
-name1:
-- some: words
-
-//!pd a2
-name3: no :a1 more
-```
-
-对 a2 段解析（指定段名 a2），展开后等价于：
-
-```pd
-name3:
-- no
-- name1:
-  - some: words
-- more
-```
-
-```json
-{
-  "name3": {
-    "Info1": ["no"],
-    "name1": { "some": "words" },
-    "Info2": ["more"]
-  }
-}
-```
-
-## 目录结构（定稿）
-
-```
-promptdown/
-├── package.json                  # VSCode 扩展 manifest + bin: pd2json + 类型/入口
-├── tsconfig.json
-├── .vscodeignore                 # vsce 打包排除
-├── .gitignore
-├── README.md                     # 简介 + 用法
-├── CHANGELOG.md
-├── LICENSE                       # ✅ 已有
-├── docs/
-│   ├── SPEC.md                   # ⭐ 语法规范 —— 唯一事实来源（CLI/skill/grammar 都引用它）
-│   └── DESIGN.md                 # 设计决策记录（为什么不用 toon/plf/LangGPT/cpf）
-├── syntaxes/
-│   └── pd.tmLanguage.json        # TextMate 语法（VSCode 高亮）
-├── language-configuration.json   # 括号匹配等
-├── src/
-│   ├── cli.ts                    # pd2json CLI 入口（读文件 → 选段 → 展开引用 → parser → JSON）
-│   └── parser/
-│       ├── lexer.ts              # 行分类（段标记/分隔线/键值/带-键值/内容/引用）
-│       ├── parser.ts             # 块栈构建（缩进找爸爸 + Subject + 顶层-缩进报错）
-│       ├── expand.ts             # 引用内联展开（编译期，按段名）
-│       ├── toJson.ts             # 树 → JSON（含单条折叠规则）
-│       └── types.ts              # 行类型/AST 定义
-├── skill/
-│   └── SKILL.md                  # pi skill：//!pd 触发，语法速查 + 引用 SPEC.md
-└── test/
-    ├── fixtures/
-    │   ├── flat.pd               # 范例 1
-    │   ├── anon.pd               # 范例 2
-    │   ├── subject.pd            # 范例 3
-    │   ├── ref.pd                # 范例 4（多段 + 引用）
-    │   └── err.pd                # 顶层 - 缩进语法错误样例（忽略）
-    └── parser.test.ts            # node:test，断言转 JSON 结果
-```
-
-设计要点：
-
-- **纯声明式 VSCode 扩展**：高亮只需 package.json 的 `contributes.languages` + `contributes.grammars` + grammar 文件，**不需要 extension.ts**（零 JS，最简）。后续要加命令面板再补
-- **CLI**：`"bin": { "pd2json": "./dist/cli.js" }`，tsc 编译到 dist/，dev 用 tsx；参数：`pd2json <file.pd> <段名>`（单段可省略段名）
-- **skill 独立目录**：随项目发布；SKILL.md 引用 `../docs/SPEC.md` 作为详细规范，避免内容重复
-- **docs/SPEC.md 是唯一事实来源**：语法规则只写一份，grammar/parser/skill 都照它实现
-- **测试**：node:test（Node 内置，零依赖）+ fixtures
-
-## 实施步骤
-
-- [ ] 1. pnpm init + tsconfig（strict）+ .gitignore + .vscodeignore
-- [ ] 2. 写 docs/SPEC.md（语法规范，含全部用户范例）
-- [ ] 3. 实现 parser：types.ts → lexer.ts（行分类）→ parser.ts（块栈/缩进找爸爸/Subject/顶层-缩进忽略）→ toJson.ts（单条折叠）
-- [ ] 4. 实现 expand.ts（引用内联展开，段名定位）
-- [ ] 5. 实现 cli.ts（文件 + 段名参数），注册 bin
-- [ ] 6. test/fixtures + parser.test.ts，跑通范例 1/2/3/4
-- [ ] 7. 写 syntaxes/pd.tmLanguage.json（高亮：段标记/分隔线/键值/`-` 项/引用/Info 键）
-- [ ] 8. language-configuration.json + package.json contributes 注册 .pd 语言
-- [ ] 9. 写 skill/SKILL.md（//!pd 触发词 + 语法速查 + 引用 SPEC.md）
-- [ ] 10. 打包 .vsix（vsce）+ pnpm 发布准备
-- [ ] 11. 初始提交
-
-## 验证
-
-- `pd2json test/fixtures/flat.pd <段名>` 输出与范例 1 JSON 一致；anon.pd 与范例 2 一致；subject.pd 与范例 3 一致；ref.pd 与范例 4 一致
-- `pnpm test` 通过（node:test）
-- VSCode 打开 .pd 文件：高亮正常、无红线（无 LSP 无拼写干扰）
-- pi 中提问含 `//!pd` 时加载 skill 正确解析
-
-## 待确认
-
-1. 折叠规则的精确判定：`key: value` 同行有内容 + 之后无续行内容/无子键 → 字符串；否则套对象。边界情况：`key: value` 后跟空行再 EOF，算单条还是多条？（默认：单条）
-2. 顶层 `-` 缩进的语法错误：v1 忽略该行，后续是否要报错/警告输出
-3. 范例 4 展开时 `some: words` 的归属已由用户确认（`"some": "words"`），但展开过程中缩进调整的通用算法实现时需对照用户范例验证
+- 单测：`listItemWsRun` 全矩阵断言（含 null 与非序列项行）；全部 73+ 用例通过
+- 手工（VSCode F5 扩展宿主）：按上表逐行验证光标落点——重点：续行 `-` 后 Tab 光标停在行尾可继续输入；col 0 连续 Tab 光标不动；`-   x` 收拢后光标在行尾
+- 确认无 `.then()` 异步光标代码残留（回归面：跨行多选分支同样走 `indentLines`）

@@ -6,7 +6,7 @@ import {
 	mayBeCommentLine,
 } from "./auto-detect";
 import { isPdFileName, pdToJsonText, sectionNames } from "./pd2json";
-import { isListItemLine, tabUnit } from "./tab";
+import { isListItemLine, listItemWsRun, tabUnit } from "./tab";
 
 const PD_LANGUAGE = "promptdown";
 /** 参与自动检测的语言：无格式归属的弱语法文件（untitled/txt/log 默认即 plaintext） */
@@ -65,6 +65,85 @@ async function runPd2Json(): Promise<void> {
 }
 
 /**
+ * 整行右缩进一个缩进单位；序列项行同时把 `-` 后空白规范化为单个半角空格。
+ * 每行两个互不重叠的编辑：行首插入缩进单位 + 空白段小范围替换。
+ * 光标由 VSCode 原生调整（插入点前移 → 光标跟随文本；恰在插入点 col 0 → 不动），
+ * 与原生 indentLines 的光标语义一致，无需手动还原。
+ */
+function indentLines(
+	editor: vscode.TextEditor,
+	lines: number[],
+	unit: string,
+): void {
+	const doc = editor.document;
+	void editor.edit((edit) => {
+		// 去重：同一行只编一次（防多光标/选区重叠导致 “overlapping edits” 报错）
+		for (const line of new Set(lines)) {
+			const run = listItemWsRun(doc.lineAt(line).text);
+			edit.insert(new vscode.Position(line, 0), unit);
+			if (run?.normalize) {
+				edit.replace(new vscode.Range(line, run.start, line, run.end), " ");
+			}
+		}
+	});
+}
+
+/**
+ * Tab 键命令：序列项行（`-` 开头，`-` 后可无空白）整行右缩进并把 `-` 后规范化为单空格，
+ * 其余行还原默认 Tab 行为（插入缩进单位）。
+ */
+function registerTabCommand(): vscode.Disposable {
+	return vscode.commands.registerTextEditorCommand(
+		"promptdown.tab",
+		(editor) => {
+			const doc = editor.document;
+			const config = vscode.workspace.getConfiguration("editor", doc);
+			const indentSize = config.get<number | "tabSize">("indentSize");
+			const unit = tabUnit(
+				config.get<boolean>("insertSpaces", true),
+				typeof indentSize === "number"
+					? indentSize
+					: config.get<number>("tabSize", 4),
+			);
+
+			// ① 跨行选区：所有选区涉及的行整体缩进（与原生多行缩进一致）
+			if (
+				editor.selections.some((s) => !s.isEmpty && s.start.line !== s.end.line)
+			) {
+				const lines = new Set<number>();
+				for (const s of editor.selections) {
+					for (let l = s.start.line; l <= s.end.line; l++) lines.add(l);
+				}
+				indentLines(editor, [...lines], unit);
+				return;
+			}
+
+			// ② 所有光标所在行都是序列项行 → 整行缩进
+			if (
+				editor.selections.every((s) =>
+					isListItemLine(doc.lineAt(s.active.line).text),
+				)
+			) {
+				indentLines(
+					editor,
+					editor.selections.map((s) => s.active.line),
+					unit,
+				);
+				return;
+			}
+
+			// ③ 其余情况：还原默认 Tab 行为 —— 插入缩进单位
+			void editor.edit((edit) => {
+				for (const s of editor.selections) {
+					if (s.isEmpty) edit.insert(s.active, unit);
+					else edit.replace(s, unit);
+				}
+			});
+		},
+	);
+}
+
+/**
  * promptdown 扩展入口：
  * 1. 注册文档格式化程序（promptdown 语言）
  * 2. pd2json 命令：当前 PD 文档解析为 JSON，新开 untitled 文件展示（不覆盖原文档）
@@ -77,45 +156,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand("promptdown.pd2json", runPd2Json),
 	);
 
-	// ---- Tab 键：序列项行（`- ` 开头）整行右缩进，其余插入 tab ----
-	context.subscriptions.push(
-		vscode.commands.registerTextEditorCommand("promptdown.tab", (editor) => {
-			const doc = editor.document;
-
-			// 跨行选区：交给编辑器原生多行缩进
-			if (
-				editor.selections.some((s) => !s.isEmpty && s.start.line !== s.end.line)
-			) {
-				void vscode.commands.executeCommand("editor.action.indentLines");
-				return;
-			}
-
-			// 所有光标所在行行首都是 `- `（序列项）→ 整行右缩进一个 tab
-			const allListItems = editor.selections.every((s) =>
-				isListItemLine(doc.lineAt(s.active.line).text),
-			);
-			if (allListItems) {
-				void vscode.commands.executeCommand("editor.action.indentLines");
-				return;
-			}
-
-			// 其余情况：还原默认 Tab 行为 —— 插入缩进单位（遵循 editor.insertSpaces / editor.indentSize / editor.tabSize）
-			const config = vscode.workspace.getConfiguration("editor", doc);
-			const indentSize = config.get<number | "tabSize">("indentSize");
-			const unit = tabUnit(
-				config.get<boolean>("insertSpaces", true),
-				typeof indentSize === "number"
-					? indentSize
-					: config.get<number>("tabSize", 4),
-			);
-			void editor.edit((edit) => {
-				for (const s of editor.selections) {
-					if (s.isEmpty) edit.insert(s.active, unit);
-					else edit.replace(s, unit);
-				}
-			});
-		}),
-	);
+	// ---- Tab 键：序列项行（`-` 开头）整行右缩进，其余插入 tab ----
+	context.subscriptions.push(registerTabCommand());
 
 	// ---- 格式化程序（promptdown 语言） ----
 	context.subscriptions.push(
