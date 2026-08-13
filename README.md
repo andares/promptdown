@@ -27,7 +27,7 @@
 | 🔗 **嵌套引用** | `:refname` 编译期内联展开，多段 `//!pd <name>` 混排复用 |
 | 🎨 **VSCode 高亮** | TextMate grammar 纯声明式扩展，**无需 LSP**，零红线 |
 | ✨ **自动格式化** | CLI `pdformat` + VSCode 格式化程序，首个/后续冒号判定与顶层缩进一键规范 |
-| ⚡ **编辑器命令** | 命令面板输入 `pd2json` 一键转 JSON（新开 Untitled 不覆盖原文），`-` 列表自动续行 |
+| ⚡ **编辑器命令** | 命令面板输入 `pd2json` 一键转 JSON（新开 Untitled 不覆盖原文），`-` 列表自动续行，序列项行按 Tab 整体缩进 |
 | 🔍 **自动检测** | untitled / 纯文本出现 `//!pd` 段标记即自动切换 pd 语言（高亮 + 格式化，可关） |
 | 🤖 **AI 友好** | 内置 skill：看到 `//!pd` 即按 pd 格式解析 |
 | 📝 **兼容 Markdown** | 内联 `**粗体**`、`` `代码` `` 等保留原文，混输无压力 |
@@ -229,6 +229,17 @@ code --install-extension promptdown-<version>.vsix
 
 > 生效条件：`editor.autoIndent` 开启（默认开启）。
 
+### ⇥ Tab 缩进
+
+在序列项行（行首为 `-` 后跟空格，可带缩进）按 **Tab**，整行向右缩进一个 tab —— 快速调整嵌套层级（pd 的缩进即父子关系），而不是在光标处插入 tab 字符：
+
+| 场景 | Tab 行为 |
+| --- | --- |
+| 光标在 `- foo` / `- key: value` 等序列项行上 | 整行右缩进一个 tab |
+| 其他行（键值行、内容行等） | 还原默认：插入 tab（遵循 `editor.insertSpaces` / `editor.tabSize`） |
+| 跨行多选 | 所有选中行整体右缩进 |
+| 补全列表 / 行内联补全（ghost text）/ 片段导航中 | 不拦截，保持 VSCode 原生行为 |
+
 ### 📁 文件图标
 
 扩展附带图标主题 **promptdown Icons**（继承 Seti，只替换 `.pd` 图标）：
@@ -323,7 +334,7 @@ pnpm tag-current          # 给当前版本打本地 tag vX.Y.Z（已存在则�
 pnpm release patch -- --dry-run   # 先预览计划
 ```
 
-- `pnpm release`：sync（未提交改动自动 commit、未推送自动 push，没有则跳过）→ 门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `git push origin <分支> --tags` → 创建 GitHub Release。**不做 vsce**
+- `pnpm release`：sync（未提交改动自动 commit、本地领先自动 push、本地落后中止提示 pull，没有则跳过）→ 门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `git push origin <分支> refs/tags/vX.Y.Z` → 创建 GitHub Release。**不做 vsce**
 - `pnpm release-all`：与 release **前面完全一样（一个步骤不少）**，末尾追加 vsce package + publish；npm 失败中止，vsce 失败降级为只发 npm
 
 ## 📁 项目结构

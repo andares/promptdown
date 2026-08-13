@@ -6,10 +6,12 @@
  *   pnpm release-all patch        # npm + VSCode 一起发：npm 失败中止，vsce 失败降级为只发 npm
  *
  * 模式：
- * - release：sync（未提交改动 → git add -A + commit；未推送 → push，失败中止）→
+ * - release：sync（未提交改动 → git add -A + commit；本地领先 → push 分支，
+ *   失败中止；本地落后 → 中止提示 pull；没有 → 跳过）→
  *   门禁 → bump(major|minor|patch) → commit+tag → pnpm publish（失败中止）
- *   → git push origin <当前分支> --tags（best-effort，失败仅警告）→
- *   创建 GitHub Release v{next}（best-effort：未设 GITHUB_TOKEN / 已存在 / 失败都只提示、不中止）。
+ *   → git push origin <当前分支> refs/tags/v{next}（best-effort，失败仅警告）→
+ *   创建 GitHub Release v{next}（best-effort：未设 GITHUB_TOKEN / tag 未到远端 /
+ *   已存在 / 失败都只提示、不中止）。
  *   不做 vsce package/publish。
  * - release-all：同 release（前面所有步骤一个不少），npm 成功后额外跑
  *   vsce package + publish——vsce 凭据（VSCE_PAT 环境变量或 `vsce login` 存的
@@ -154,13 +156,19 @@ function vsceCredentialAvailable() {
 
 const vsceCred = vsceCredentialAvailable();
 
-const branch =
-	run(git, ["branch", "--show-current"], {
-		stdio: "pipe",
-		allowFailure: true,
-	})
-		.stdout.toString()
-		.trim() || "master";
+const branch = run(git, ["branch", "--show-current"], {
+	stdio: "pipe",
+	allowFailure: true,
+})
+	.stdout.toString()
+	.trim();
+if (!branch) {
+	console.error(
+		`${C.red}无法确定当前分支（detached HEAD？）— 中止。` +
+			`请在目标分支上运行 release。${C.reset}`,
+	);
+	process.exit(1);
+}
 
 if (dryRun) {
 	console.log(`\n${C.dim}--dry-run -- nothing changed. Would run:${C.reset}`);
@@ -170,9 +178,28 @@ if (dryRun) {
 	console.log(`  1. pnpm typecheck && pnpm test && pnpm build`);
 	console.log(`  2. bump package.json version → ${next}`);
 	if (tagExists(`v${next}`)) {
-		console.log(
-			`  3. git commit -m "chore: release v${next}" + tag-current（tag v${next} 已存在，跳过打 tag）`,
-		);
+		const tagCommit = run(
+			git,
+			["rev-parse", "-q", "--verify", `refs/tags/v${next}^{commit}`],
+			{
+				stdio: "pipe",
+				allowFailure: true,
+			},
+		)
+			.stdout.toString()
+			.trim();
+		const head = run(git, ["rev-parse", "HEAD"], { stdio: "pipe" })
+			.stdout.toString()
+			.trim();
+		if (tagCommit === head) {
+			console.log(
+				`  3. git commit -m "chore: release v${next}" + tag-current（tag v${next} 已存在且指向 HEAD，跳过打 tag）`,
+			);
+		} else {
+			console.log(
+				`  3. git commit -m "chore: release v${next}" 后 tag-current 将报错（tag v${next} 指向 ${tagCommit.slice(0, 8)}，不是当前 HEAD）`,
+			);
+		}
 	} else {
 		console.log(
 			`  3. git commit -m "chore: release v${next}" + tag-current（git tag v${next}）`,
@@ -181,7 +208,9 @@ if (dryRun) {
 	console.log(
 		`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`,
 	);
-	console.log(`  5. git push origin ${branch} --tags（best-effort）`);
+	console.log(
+		`  5. git push origin ${branch} refs/tags/v${next}（best-effort）`,
+	);
 	console.log(
 		`  6. 创建 GitHub Release v${next}` +
 			(process.env.GITHUB_TOKEN
@@ -213,11 +242,15 @@ const dirty = run(git, ["status", "--porcelain"], { stdio: "pipe" })
 	.stdout.toString()
 	.trim();
 if (dirty) {
+	console.log(
+		`${C.dim}工作区有 ${dirty.split("\n").length} 个未提交文件，将全部提交：\n${dirty
+			.split("\n")
+			.map((l) => `  ${l}`)
+			.join("\n")}${C.reset}`,
+	);
 	run(git, ["add", "-A"]);
 	run(git, ["commit", "-m", "chore: sync uncommitted changes before release"]);
-	console.log(
-		`${C.green}✅ 已提交 ${dirty.split("\n").length} 个未同步文件${C.reset}`,
-	);
+	console.log(`${C.green}✅ 已提交${C.reset}`);
 } else {
 	console.log(`${C.dim}工作区干净，无未提交改动${C.reset}`);
 }
@@ -227,9 +260,26 @@ const hasUpstream =
 		stdio: "pipe",
 		allowFailure: true,
 	}).status === 0;
-let ahead = 0;
 if (hasUpstream) {
-	ahead =
+	// 本地落后远端：push 会被拒（non-fast-forward），且 bump 会基于旧代码——
+	// 提前中止，避免发布出旧代码版本或 tag 无法推送。
+	const behind =
+		parseInt(
+			run(git, ["rev-list", "--count", `HEAD..${upstreamRef}`], {
+				stdio: "pipe",
+			})
+				.stdout.toString()
+				.trim(),
+			10,
+		) || 0;
+	if (behind > 0) {
+		console.error(
+			`${C.red}本地落后 origin/${branch} ${behind} 个 commit — 中止。` +
+				`\n  请先同步（git pull --rebase origin ${branch}）再重跑 release。${C.reset}`,
+		);
+		process.exit(1);
+	}
+	const ahead =
 		parseInt(
 			run(git, ["rev-list", "--count", `${upstreamRef}..HEAD`], {
 				stdio: "pipe",
@@ -238,21 +288,19 @@ if (hasUpstream) {
 				.trim(),
 			10,
 		) || 0;
-} else {
-	ahead = -1; // 远端还没有该分支 → 本地全部未推送
-}
-if (ahead !== 0) {
-	if (ahead === -1) {
-		console.log(`${C.dim}远端无 origin/${branch} 分支，将全量推送${C.reset}`);
-	} else {
+	if (ahead > 0) {
 		console.log(
 			`${C.dim}本地领先 origin/${branch} ${ahead} 个 commit，将推送${C.reset}`,
 		);
+		run(git, ["push", "origin", branch]); // 失败中止：tag 必须建立在已推送的代码上
+		console.log(`${C.green}✅ 已推送到 origin/${branch}${C.reset}`);
+	} else {
+		console.log(`${C.dim}无未推送 commit，跳过 push${C.reset}`);
 	}
-	run(git, ["push", "origin", branch]); // 失败中止：tag 必须建立在已推送的代码上
-	console.log(`${C.green}✅ 已推送到 origin/${branch}${C.reset}`);
 } else {
-	console.log(`${C.dim}无未推送 commit，跳过 push${C.reset}`);
+	console.log(`${C.dim}远端无 origin/${branch} 分支，将全量推送${C.reset}`);
+	run(git, ["push", "origin", branch]); // 失败中止
+	console.log(`${C.green}✅ 已推送到 origin/${branch}${C.reset}`);
 }
 
 // 1. Checks gate — abort before anything is changed if they fail.
@@ -298,8 +346,8 @@ if (publish.status !== 0) {
 // 5. push 分支 + tags（两种模式都做；失败仅警告——可能此前已推过）。
 //    然后创建 GitHub Release v${next}（两种模式都做，best-effort：
 //    未设 token / 已存在 / 失败都只提示，不中止）。
-step("git push（分支 + tags）");
-const push = run(git, ["push", "origin", branch, "--tags"], {
+step("git push（分支 + tag）");
+const push = run(git, ["push", "origin", branch, `refs/tags/v${next}`], {
 	allowFailure: true,
 });
 if (push.status !== 0) {
@@ -312,6 +360,22 @@ if (!process.env.GITHUB_TOKEN) {
 	console.warn(
 		`${C.yellow}未设置 GITHUB_TOKEN — 跳过 GitHub Release 创建。` +
 			`npm 已发布 v${next}，可稍后手动创建 release。${C.reset}`,
+	);
+} else if (
+	run(
+		git,
+		["ls-remote", "--exit-code", "--tags", "origin", `refs/tags/v${next}`],
+		{
+			stdio: "pipe",
+			allowFailure: true,
+		},
+	).status !== 0
+) {
+	// push 是 best-effort，可能失败——此时 GitHub 会为不存在的 tag 自动
+	// 创建指向远程默认分支 tip 的 Release，内容错误，故先跳过创建。
+	console.warn(
+		`${C.yellow}tag v${next} 尚未推送到远端 — 跳过 GitHub Release 创建。` +
+			`\n  稍后可手动: git push origin refs/tags/v${next}，再手动创建 Release。${C.reset}`,
 	);
 } else {
 	const rel = run(

@@ -7,10 +7,12 @@
  *
  * 行为：
  *  - tag 名 = `v${package.json 的 version}`，打在当前 HEAD 上
- *  - 检测 tag 是否已存在（git rev-parse --verify）——已存在则跳过、不重复打
- *  - **只打本地 tag，不推送**（推送由 release-all 的 GitHub 步骤负责）
+ *  - 检测 tag 是否已存在：已存在且指向当前 HEAD → 跳过（重试场景）；
+ *    已存在但指向其他 commit → 报错退出（静默跳过会让 tag 指向旧代码，
+ *    release commit 反而没有 tag）
+ *  - **只打本地 tag，不推送**（推送由 publish.mjs 的 push 步骤负责）
  *
- * 在 release-all 中 bump + commit 之后调用：此时 package.json 已是新版本，
+ * 在 release 中 bump + commit 之后调用：此时 package.json 已是新版本，
  * 打出的 tag 恰好指向 release commit。
  */
 import { spawnSync } from "node:child_process";
@@ -60,15 +62,29 @@ function run(cmd, args, opts = {}) {
 	return res;
 }
 
-// 检测 tag 是否已存在——已存在则跳过，不重复打。
-const exists =
-	run(git, ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], {
-		stdio: "pipe",
-		allowFailure: true,
-	}).status === 0;
-if (exists) {
-	console.log(`${C.yellow}tag ${tag} 已存在，跳过打 tag（不重复打）${C.reset}`);
-	process.exit(0);
+// 检测 tag 是否已存在：已存在且指向当前 HEAD → 跳过（重试场景）；
+// 已存在但指向其他 commit → 报错退出（拒绝覆盖，避免 tag 指向旧代码）。
+const tagRef = run(
+	git,
+	["rev-parse", "-q", "--verify", `refs/tags/${tag}^{commit}`],
+	{ stdio: "pipe", allowFailure: true },
+);
+if (tagRef.status === 0) {
+	const tagCommit = tagRef.stdout.toString().trim();
+	const head = run(git, ["rev-parse", "HEAD"], { stdio: "pipe" })
+		.stdout.toString()
+		.trim();
+	if (tagCommit === head) {
+		console.log(
+			`${C.yellow}tag ${tag} 已存在且指向当前 HEAD，跳过（不重复打）${C.reset}`,
+		);
+		process.exit(0);
+	}
+	console.error(
+		`${C.red}tag ${tag} 已存在但指向 ${tagCommit.slice(0, 8)}（当前 HEAD ${head.slice(0, 8)}）— 拒绝覆盖。` +
+			`\n  若确认要重打：git tag -d ${tag} 后重跑。${C.reset}`,
+	);
+	process.exit(1);
 }
 
 if (dryRun) {

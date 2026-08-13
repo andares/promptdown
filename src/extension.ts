@@ -6,6 +6,7 @@ import {
 	mayBeCommentLine,
 } from "./auto-detect";
 import { isPdFileName, pdToJsonText, sectionNames } from "./pd2json";
+import { isListItemLine, tabUnit } from "./tab";
 
 const PD_LANGUAGE = "promptdown";
 /** 参与自动检测的语言：无格式归属的弱语法文件（untitled/txt/log 默认即 plaintext） */
@@ -74,6 +75,46 @@ export function activate(context: vscode.ExtensionContext): void {
 	// ---- pd2json 命令 ----
 	context.subscriptions.push(
 		vscode.commands.registerCommand("promptdown.pd2json", runPd2Json),
+	);
+
+	// ---- Tab 键：序列项行（`- ` 开头）整行右缩进，其余插入 tab ----
+	context.subscriptions.push(
+		vscode.commands.registerTextEditorCommand("promptdown.tab", (editor) => {
+			const doc = editor.document;
+
+			// 跨行选区：交给编辑器原生多行缩进
+			if (
+				editor.selections.some((s) => !s.isEmpty && s.start.line !== s.end.line)
+			) {
+				void vscode.commands.executeCommand("editor.action.indentLines");
+				return;
+			}
+
+			// 所有光标所在行行首都是 `- `（序列项）→ 整行右缩进一个 tab
+			const allListItems = editor.selections.every((s) =>
+				isListItemLine(doc.lineAt(s.active.line).text),
+			);
+			if (allListItems) {
+				void vscode.commands.executeCommand("editor.action.indentLines");
+				return;
+			}
+
+			// 其余情况：还原默认 Tab 行为 —— 插入缩进单位（遵循 editor.insertSpaces / editor.indentSize / editor.tabSize）
+			const config = vscode.workspace.getConfiguration("editor", doc);
+			const indentSize = config.get<number | "tabSize">("indentSize");
+			const unit = tabUnit(
+				config.get<boolean>("insertSpaces", true),
+				typeof indentSize === "number"
+					? indentSize
+					: config.get<number>("tabSize", 4),
+			);
+			void editor.edit((edit) => {
+				for (const s of editor.selections) {
+					if (s.isEmpty) edit.insert(s.active, unit);
+					else edit.replace(s, unit);
+				}
+			});
+		}),
 	);
 
 	// ---- 格式化程序（promptdown 语言） ----

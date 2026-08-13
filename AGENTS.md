@@ -71,13 +71,13 @@ src/
 - `release-all`：**追加 vsce**——vsce package + publish 必走，无 vsce 凭据或失败时**降级为只发 npm**（提示，不中止，可稍后手动补发）；npm 失败即中止（版本已锚定）
 
 1. 参数校验：`patch | minor | major` 恰好一个；`--dry-run` 只预览
-2. **sync**：未提交改动 → `git add -A` + commit `chore: sync uncommitted changes before release`；本地领先远端 → `git push origin <分支>`（失败中止）；都没有 → 跳过不推。保证 release commit 与 tag 建立在线上最新代码上，不会出现“文件没提交但 tag 已打”
+2. **sync**：未提交改动 → 展示清单 + `git add -A` + commit `chore: sync uncommitted changes before release`；本地领先远端 → `git push origin <分支>`（失败中止）；本地落后远端 → 中止（提示 `git pull --rebase`）；都没有 → 跳过不推。保证 release commit 与 tag 建立在线上最新代码上，不会出现“文件没提交但 tag 已打”
 3. 门禁：typecheck + test + build，失败即中止
 4. bump `package.json` version（2 空格缩进 + 尾换行）
 5. `git commit -m "chore: release vX.Y.Z"`，然后调用 `scripts/tag-current.mjs` 打 tag（检测已存在 → 不重复打，指向 release commit）
 6. `pnpm publish --no-git-checks --access=public`（prepublishOnly 再次门禁 typecheck+test+build；失败中止，回滚见下）
-7. `git push origin <当前分支> --tags`（两种模式都做，尝试一次，失败仅警告——可能此前已推过）
-8. 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；未设 token / 其他失败 → 仅警告）——**两种模式都做**
+7. `git push origin <当前分支> refs/tags/vX.Y.Z`（两种模式都做，只推该 tag 非全量 --tags；尝试一次，失败仅警告——可能此前已推过）
+8. 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）且 tag 已到远端（`git ls-remote` 验证，push 失败时跳过避免 Release 指向错误 commit），就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；其他失败 → 仅警告）——**两种模式都做**
 9. **[release-all 追加]** `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`；若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据（`pnpm exec vsce login andares` 存的明文文件——本机 keytar 原生模块未编译，vsce 自动降级为文件存储），自动 `vsce publish`；否则提示手动补发
 
 `pnpm tag-current` 可独立使用：给当前 HEAD 打本地 `v{version}` tag（已存在则跳过），**只打 tag 不推送**。

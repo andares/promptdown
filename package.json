@@ -11,7 +11,8 @@
     "onLanguage:promptdown",
     "onDidOpenTextDocument",
     "onDidChangeTextDocument",
-    "onCommand:promptdown.pd2json"
+    "onCommand:promptdown.pd2json",
+    "onCommand:promptdown.tab"
   ],
   "repository": {
     "type": "git",
@@ -42,6 +43,13 @@
       {
         "command": "promptdown.pd2json",
         "title": "pd2json: 将当前 PD 文档解析为 JSON（新开 Untitled 文件）"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "promptdown.tab",
+        "key": "tab",
+        "when": "editorTextFocus && editorLangId == promptdown && !editorReadonly && !suggestWidgetVisible && !inSnippets && !inlineSuggestionVisible && !hasOtherSuggestions"
       }
     ],
     "languages": [
