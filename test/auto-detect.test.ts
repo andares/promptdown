@@ -79,3 +79,9 @@ test("isPdMarkerLine: 非标记行", () => {
 	assert.equal(isPdMarkerLine("foo //!pd"), false);
 	assert.equal(isPdMarkerLine("hello"), false);
 });
+
+test("detectPdIntent: 围栏内 //!pd 不算段标记（与 splitSections 同规则）", () => {
+	assert.equal(detectPdIntent("```md\n//!pd 不是段\n```\n"), false);
+	assert.equal(detectPdIntent("```md\n//!pd 不是段\n```\n//!pd 真段\n"), true);
+	assert.equal(detectPdIntent("```\n```\n//!pd x\n"), true); // 围栏闭合后再触发
+});

@@ -1,138 +1,142 @@
-# pdtransform：pd2json 升级为双向转换 CLI + VSCode 命令
+# pdcompile：多段编译指令 + section 寻址规范 + format 空行/转义重构
 
 ## Context
 
-pd 语法是"pd → JSON"单向设计的：`toJson` 输出稳定 JSON（折叠规则、InfoN/CodeN 编号、Subject 匿名根）。但该 JSON 结构实际是可逆的——规范 JSON（toJson 可产出的结构）可以转回 pd。计划：
+pdtransform 目前只能转单文件的选中段；多段文件"编译成单份完整 pd"（引用内联展开）没有独立命令。新增 `pdcompile`，同时**正式定义 section 寻址规范**（此前未定义清楚：字符/数字模式、`%` 序号前缀、隐式段文件主名），并重构两处格式化逻辑：
 
-1. CLI 命令 `pd2json` → **`pdtransform`**（`src/cli.ts` + `package.json` bin + VSCode 命令改名）
-2. CLI 自动识别输入是 pd 还是 json，双向转换
-3. VSCode 命令同步改双向：PD 文档 → 新开 Untitled JSON；JSON 文档 → 新开 Untitled PD
-4. JSON→PD 输出空行规则：默认无空行；**唯一例外**：顶层的带子域键值后跟顶层内容（键值/文本块/代码块）时，中间空一行
-5. VSCode 命令 UX（用户指定）：查询关键字 **`pdtransform`**、命令名 **`Promptdown格式转换`**、说明文字 **`.pd格式与JSON互相转换`**（灰色第二行）
+1. json→pd 的空行方案移入 `format()`（CLI pdformat + VSCode format 统一生效），compile/transform-to-pd 输出后统一 format，jsonToPd 移除自身空行逻辑
+2. json→pd 的 `:-` 转义规则扩展（冒号 → `:-`/`：-`、保留空格），配合自动 format 防止内容项被格式化成键值
+3. **代码块豁免**（新任务）：``` 围栏与 ` 行内代码内部的冒号不参与键值/引用判定——已确认 ``` 围栏内的 `:ref` 会被 expand 错误展开、围栏内 `//!pd` 行会被 splitSections 误切段（两个真实 bug）；行内代码（`` ` ``）在语法/format/lexer 各层均无豁免规则（需新增）
 
 ## Approach
 
-### 1. 类型识别（CLI + VSCode 共用纯逻辑）
+### 1. section 寻址规范（核心定义）
 
-优先级：**扩展名 → 内容探针**（新增 `detectTransformKind(fileName, text)`，放 `src/pdtransform.ts`）：
+**全局段列表**：所有输入文件的 section 按"文件参数顺序 → 文件内段顺序"依次压入一个全局列表，从 1 编号。无论文件是否有 `//!pd`、段是否命名，每个 section 都有序号。
 
-| 输入 | 判定 | 方向 |
-| --- | --- | --- |
-| `*.pd`（大小写不敏感） | 扩展名 | pd → JSON |
-| `*.json`（大小写不敏感） | 扩展名 | JSON → pd |
-| 其他/无扩展名 | 探针①：前 50 行含 `//!pd` 段标记（复用 `detectPdIntent`）→ pd | pd → JSON |
-| 其他/无扩展名 | 探针②：trim 后 `JSON.parse` 成功 → json | JSON → pd |
-| 都不匹配 | 报错退出（CLI） / showErrorMessage（VSCode） | — |
+| 规则 | 定义 |
+| --- | --- |
+| 字符模式（命名） | `//!pd <name>` 的 name；**命名是数字也算字符**（`//!pd 1` → 命名 `1`） |
+| 数字模式（序号） | 全局 1-based 序号，**必须以 `%` 开头**：`%1` = 第 1 个 section |
+| `%` 转义 | 命名第一个字符是 `%` → 存储名加倍为 `%%`（不判断是否已是 `%%`，`%%` 开头 → `%%%`）。寻址时字符模式直接与存储名比较 |
+| 隐式段（无 `//!pd`） | 整个文件是一个 section，**文件主名（去扩展名）即段名**；有 `//!pd` 但未命名 → 匿名段，**不**自动赋文件名，只能序号访问 |
+| 命名与序号并存 | 有命名的段既可用名字也可用 `%N` 指定；匿名段只能 `%N` |
+| 跨文件重名（pdcompile） | **先到先得**：先出现的段拥有名字，后出现的同名段自动变匿名（只能 `%N` 访问）；引用 byName 同规则 |
 
-VSCode 方向判定优先看 `languageId`（promptdown / json），再走上述逻辑。扩展名优先于内容探针（.json 文件里写 pd 按 json 处理，parse 失败即报错）。
+**寻址解析**（`resolveSection(sections, selector)`）：
 
-### 2. pd → JSON 方向（现有逻辑，基本不动）
+- selector 以 `%` 开头且其后为纯数字 → 序号模式（1-based，越界报错 `段不存在: 第 N 块（文件共 M 段）`）
+- 否则 → 字符模式：匹配存储名（已转义）`name === selector`，找不到报错
 
-`expand(text, section)` → `lex` → `parse` → `toJson` → stdout。引用 `:refname` 编译期内联展开、多段选择逻辑保留。
+**隐式段命名与 `%` 转义落在哪层**：`splitSections` 保持纯文本（不知道文件名）；新增 `nameSections(sections, fileStem)`（隐式段赋文件主名 + `%` 转义）由 CLI/VSCode 调用。
 
-**段选择器升级**（新增 `resolveSection(sections, selector)`）：位置参数第二个：
+### 2. pdcompile CLI（新入口 `src/compile-cli.ts`，bin `pdcompile`）
 
-- 先按**段名**精确匹配
-- 匹配不上且是正整数 → **1-based 序号**（`2` = 第 2 块；裸 `//!pd` 未命名段也能按序号选）
-- 序号越界/段名不存在 → 文本提示后退出（`段不存在: xxx` / `段不存在: 第 N 块`）
-- 多段不指定 → 报错列出段名（现状保留）
-
-### 3. JSON → pd 方向（新增渲染器 `src/jsonToPd.ts`）
-
-`jsonToPdText(jsonText)` → `{ pd: string, dropped: string[] }`。根必须是对象（否则报错）；逐键按 JSON 插入序渲染，递归子块。
-
-**值类型规则**（toJson 反向；**已确认**：非文本标量一律转文本，不丢）：
-
-| JSON 值 | 渲染 | 说明 |
-| --- | --- | --- |
-| 字符串（单行、无前导空白、非空） | `key: value` | 与 toJson 折叠规则互逆 |
-| number / boolean / null | `key: ${value}` 文本 | 42 → `key: 42`、true → `key: true`、null → `key: null`；**黄字警告**（类型已转文本） |
-| 对象 | `key:` + 子内容（见下） | 空对象 → 裸 `key:` |
-| 对象内 `InfoN`（N 连续递增、值为数组） | 内容行 | 嵌套块：`- item`；顶层 Subject：裸文本行（见 §4）；元素为标量（含数字/bool/null）→ `${v}` 文本（黄字警告）；元素为对象/数组 → 丢该元素（黄字警告） |
-| 对象内 `CodeN`（N 连续递增、值为 `{lang?, body}`） | ```` ```lang```` 围栏 | 仅顶层块可挂（parser 简化规则：围栏只归属 stack[1]） |
-| 数组键（命名键直接挂数组）、多行字符串、空串、前导空白字符串 | **丢弃 + 黄字警告** | 结构性不符合，见丢弃规则 |
-
-**丢弃规则**（toJson 不可产出的结构，丢弃后仍可回环；丢弃与转文本**逐条警告**）：
-
-- 数组作为命名键的值（只有 InfoN 的值可以是数组）
-- 字符串含 `\n`、前导空白、为空串
-- `InfoN` / `CodeN` 编号不连续（Info2 无 Info1）、值为空数组、元素含 `\n`
-- `CodeN` 出现在深度 ≥ 2（围栏只会挂到顶层块，无法表示）
-- 顶层（根）出现 `InfoN`/`CodeN`（toJson 根只输出命名键；根键 `InfoN` 会歧义，丢）
-- 相邻两个 InfoN 段（中间无键值，pd 中会合并为一段）
-- 内容项若解析后会变成键值/序列/段标记（如 `- foo`、`foo: bar`、`//!pd`、`---`、```` ``` ````）——裸渲染会改变结构，丢
-
-**Subject（`SubjectN` 根键）还原**（toJson 根键含自动生成的 Subject1..N）：
-
-- 值为对象且**全部条目是 InfoN/CodeN**（无命名子键）→ 渲染为**顶层裸内容块**（文本行 + 代码围栏），不输出 `SubjectN:` 头——还原手写 pd 的散文/代码块观感
-- 含命名子键（如 `- name: value` 生成的 Subject）→ 正常渲染 `SubjectN:` + 子内容（回环安全）
-- 值为字符串 → `SubjectN: value`（显式键，回环安全）
-- 空对象 → 渲染 `SubjectN:`（回环安全）
-
-### 4. 空行规则（§ 顶层渲染）
-
-- 默认**无空行**（块内、根键之间都不空）
-- **唯一例外**：当前一个**顶层条目是"带子域键值"**（渲染为 `key:` + 缩进子内容，JSON 值为对象）时，与下一个顶层条目（键值/文本块/代码块）之间空一行。语义动机：带子域键的子内容与后续顶层内容都在缩进 0，需要空行区分
-- 简单键值（`key: value`）后不空；文本块/代码块作为**前一个**条目时不触发空行（严格按用户规则：触发条件只写"带子域的键值"）
-
-### 5. 输出与警告
-
-- CLI：JSON→pd 结果打印 stdout；**逐条黄字警告**到 stderr（ANSI `\x1b[33m`），一条处理一条：类型转文本（`count: 42 数字已转文本`）与结构性丢弃（`tags: 数组，不符合 pd 结构，已丢弃`）都警告
-- 全部被丢弃 → 输出空 pd + 警告；根非对象 → 报错退出（CLI）/ showErrorMessage（VSCode）
-- VSCode：转换结束后，收集的警告**合并调用一次 `showErrorMessage`**（右下角弹窗，逐条列出）；无警告不弹。pd→json 新开 Untitled JSON（现状）；json→pd 新开 Untitled PD（preview + 侧边）
-
-### 6. VSCode 命令面板 UX（已确认需求）
-
-面板条目 = 第一行命令名 + 第二行灰色说明。机制（查 VSCode 源码确认）：灰色第二行是 QuickPick 的 `detail`，来源于命令标题的 **alias**（本地化标题 `{value, original}` 的 `original`），且仅当 UI 语言非默认（如中文 UI）时显示；面板搜索对 label/alias 模糊匹配、对命令 id **精确**匹配。
-
-因此（`package.json` `contributes.commands`）：
-
-```json
-{
-  "command": "pdtransform",
-  "title": { "value": "Promptdown格式转换", "original": ".pd格式与JSON互相转换" }
-}
+```
+pdcompile <section> <file>[...<file>]
 ```
 
-- 第一行 = `Promptdown格式转换`；第二行灰色 = `.pd格式与JSON互相转换`（中文 UI 下生效）
-- 查询关键字 `pdtransform`：命令 id 取**非命名空间裸 id** `pdtransform`（而非 `promptdown.pdtransform`），保证面板输入 `pdtransform` 精确命中（id 只有精确匹配才参与过滤；label/alias 模糊匹配里没有该字符串）。偏离 VSCode id 命名规范是刻意的，注释说明
-- 英文 UI 下 alias 不显示（灰色行消失），第一行仍在——可接受的降级
-- `activationEvents`：`onCommand:pdtransform`（去掉旧 `onCommand:promptdown.pd2json`）
-- 多段 QuickPick 条目标签加序号：`(未命名段 #2)` 等
+- section 必填（没有 section 无从编译）
+- 流程：读全部文件 → 各文件 `splitSections` + `nameSections`（文件主名）→ 全局合并（序号 + byName）→ `resolveSection` → 展开选中段（引用跨文件内联）→ `format()` → stdout
+- 需要 expand 支持跨文件：重构 `expand.ts`，抽出 `expandSection(section, byName, ...)` 的跨文件入口（现有 `expand(text, target)` 保持单文件接口不变，内部复用）
+
+### 3. format 空行规则（换行格式化）
+
+- `format()` 增加结构化空行规则：**顶层带子域键值（`key:` 行 + 有子内容）后跟下一个顶层条目（键块/文本块/代码块）时中间空一行**；默认无空行
+- 识别基于现有 `parse(lex())`（format 已在用，顶层缩进修正同款）；顶层条目按"键值行 / 内容行 / 围栏"分组；隐式段语义（`SubjectN` 自动键不算"带子域键值"，不触发）
+- 幂等：已有空行不重复插入
+- `src/jsonToPd.ts` 移除空行 push（保留 `---` 结构性逻辑）；`cli.ts` transform-to-pd 输出、`compile-cli.ts` 输出统一 `format()`
+
+### 4. jsonToPd 转义规则扩展
+
+- 现有：键形内容项第一个 `:` → `:-`（吞空格）
+- 新：内容项第一个冒号转义——半角 `:` → `:-`、全角 `：` → `：-`，**冒号后字符保留**（`:` → `:-`）；覆盖 `a: b`、`a:b`、`a：b` 各 case，防自动 format 把内容项变成键值
+- bare（裸 Subject）与嵌套两处统一
+
+### 5. 代码块豁免（``` 围栏 + ` 行内代码）
+
+**已确认的 bug（实测复现）**：
+
+- `expandSection` 无围栏状态跟踪，``` 围栏内的 `:refname` 会被当引用展开
+- `splitSections` 会把**围栏内的 `//!pd` 行**当段标记切段（围栏被破坏、Code 内容丢失）
+
+- **``` 围栏**（各层现状/修复）：
+  - splitSections（修复）：跟踪围栏状态，围栏内的 `//!pd`/`---` 等行一律归当前段，不切段
+  - expand（修复）：围栏内行**不展开引用**（expandSection 跟踪围栏状态）
+  - TextMate：已有 `code-block` + fenced 子语法高亮（冒号不会被当 pd 键值）✓ 确认无需改
+  - format：已有 `inFence` 保护，围栏内完全原样（含行尾空白、全角冒号）✓ 确认无需改
+  - lexer/parser：围栏内不参与行解析 ✓（parse 阶段已有）
+  - jsonToPd：CodeN body 原样渲染 ✓；body 含 ``` 行丢弃（防围栏结构破坏，既有规则）✓
+  - toJson：body 原样 ✓
+- **` 行内代码**（各层新增）：
+  - 定义：`` `...` `` 配对（单 backtick，markdown 风格整体理解）；**不支持换行**——未闭合 backtick 跨行即失效，后续内容当普通字符
+  - lexer/键值判定：行内代码**内部**的 `:`/`：`/`-` 不参与该行键值/序列判定（找代码外的第一个冒号）；内部冒号也不参与 `:-` 整行转义判定
+  - format：行内代码整体字串，内部**完全不做**任何处理（冒号/分号/空格/全角冒号转换均豁免），不会给内部 `:`/`：` 加 `-`；行尾空白清理照常（代码串外）
+  - jsonToPd：内容项转义豁免行内代码内的冒号
+  - TextMate：新增行内代码漂色规则（markdown 风格整体着色）；并确保行内代码内的 `:` 不高亮为键值/引用
+  - expand/引用：行内代码内部的 `:xxx` 不识别为 refname
+
+> tree-sitter（helix 侧）本次不新增行内代码规则（不在本次范围，文档注明）；``` 围栏内引用展开修复与 tree-sitter 无关（那是 expand 层）。
+
+### 6. pdtransform 适配新寻址（CLI + VSCode）
+
+- CLI：`pdtransform <file> [段名|%序号]`——旧 `2`（裸数字=序号）语义变更：现在 `2` 走字符模式（匹配命名 `2` 的段），序号必须 `%2`（按用户"同步重构避免遗留历史问题"直接改，文档同步）
+- VSCode pdtransform QuickPick 显示规则统一：`<序号>[ <命名>]`——`%1 aaa`、`%2`、`%3 丙`；单段（隐式段或单段文件）直接转换不弹
+- VSCode 隐式段（无 `//!pd` 的文档）：文件主名 = 段名，QuickPick 显示 `%1 <文件名主名>`
+
+### 7. VSCode pdcompile 命令
+
+- 命令 id `pdcompile`；英文名 **`PD Compile Sections`**；中文名 **`PD编译分段`**；nls 本地化（与 pdtransform 同机制）
+- 行为：当前文件 → QuickPick 选段（同 pdtransform 显示规则）→ 编译（引用展开）→ format → 新开 untitled pd（preview + 侧边，不覆盖原文）
+- 与 pdtransform 共用 section 解析与 QuickPick 构建逻辑
+
+### 8. 文档全面更新
+
+- SPEC：新增 section 寻址规范章节（字符/数字模式、`%` 转义、隐式段文件主名、命名与序号并存）；格式化章节补空行规则；JSON→pd 转义规则更新
+- README / TUTORIAL / skill×2 / AGENTS / CHANGELOG：pdcompile 用法、pdtransform 新参数语法、format 空行、转义新规则
+- 旧文档中 `pdtransform file.pd 2`（裸数字序号）类示例全部改为 `%2`
 
 ## Files to modify
 
-- **`src/pd2json.ts` → `src/pdtransform.ts`**：改名 + 新增 `detectTransformKind`、`resolveSection`（段名/序号）；`pdToJsonText`、`sectionNames`、`isPdFileName` 保留，新增 `isJsonFileName`
-- **`src/jsonToPd.ts`**（新）：纯渲染器 `jsonToPdText`（可单测，无 vscode 依赖），含空行规则与丢弃规则
-- **`src/cli.ts`**：pdtransform 双向 CLI（USAGE 更新，stderr 警告）
-- **`src/extension.ts`**：命令改名 `pdtransform` + 双向 `runPdTransform`（PD→JSON / JSON→PD）；多段 QuickPick 保留并加序号；转换后合并警告弹 `showErrorMessage`
-- **`package.json`**：`bin.pd2json` → `bin.pdtransform`；`contributes.commands`：id `pdtransform`、title 本地化对象 `{value: "Promptdown格式转换", original: ".pd格式与JSON互相转换"}`；`activationEvents` 更新；description 更新
-- **`test/pd2json.test.ts`** → `test/pdtransform.test.ts`（改名 + 补充 resolveSection / detectTransformKind 测试）
-- **`test/jsonToPd.test.ts`**（新）：渲染规则、空行规则、丢弃规则、**回环不变量**（pd → JSON → pd → JSON 结果一致）
-- **`README.md` / `docs/SPEC.md`（§6 CLI + 新增 JSON→pd 章节）/ `docs/TUTORIAL.md` / `skill/promptdown/SKILL.md` / `skill/pd-author/SKILL.md` / `CHANGELOG.md` / `AGENTS.md`**：pd2json → pdtransform 全部提及 + 双向用法
+- **`src/parser/expand.ts`**：`splitSections` 导出无标记判断 + **围栏状态跟踪（围栏内 `//!pd` 不切段）**；新增 `nameSections`（隐式段文件主名 + `%` 转义）；跨文件展开入口（byName 由调用方提供）；**围栏内引用展开豁免**（expandSection 围栏状态）
+- **`src/pdtransform.ts`**：`resolveSectionName` → `resolveSection`（新寻址规范）；`pdToJsonText` 适配
+- **`src/format.ts`**：空行规则（多段按段切分应用、幂等、围栏保护、与顶层缩进修正共存）
+- **`src/jsonToPd.ts`**：移除空行逻辑；转义规则扩展（半角/全角、保留空格）
+- **`src/compile-cli.ts`**（新）：pdcompile 入口
+- **`src/cli.ts`**：pdtransform 参数新语法 + JSON→pd 输出统一 format
+- **`src/extension.ts`**：pdcompile 命令 + 两端 QuickPick 显示规则统一
+- **`package.json`**：bin `pdcompile`、command、activationEvents、nls 文案
+- **`package.nls.json` / `package.nls.zh-cn.json`**：pdcompile 双语文案
+- **测试**：`test/section.test.ts`（寻址规范）、`test/compile.test.ts`（pdcompile）、format 空行、转义新规则、QuickPick 显示逻辑；现有 resolveSectionName / format / jsonToPd 测试更新
+- **文档**：SPEC / README / TUTORIAL / skill×2 / AGENTS / CHANGELOG
 
 ## Reuse
 
-- `expand` / `splitSections` / `selectSection`（`src/parser/expand.ts`）— 段切分与引用展开；新增序号选择只需在 `selectSection` 外套一层 name-or-index 解析
-- `toJson` / `blockToJson`（`src/parser/toJson.ts`）— 反向渲染的**结构对照基准**（折叠/InfoN/CodeN 规则镜像）
-- `detectPdIntent`（`src/auto-detect.ts`）— 内容探针①（前 50 行 `//!pd`）
-- `lexLine` / `matchKeyValue`（`src/parser/lexer.ts`）— 渲染后内容项是否会被误解析为键值/序列的判定
-- 现有 `isPdFileName`、`sectionNames`（`src/pd2json.ts`）
+- `splitSections` / `selectSection` / `expandSection`（`src/parser/expand.ts`）——段切分与引用展开，重构出跨文件入口
+- `format()`（`src/format.ts`）——空行规则加入后统一出口
+- `lexLine` / `matchKeyValue`（`src/parser/lexer.ts`）——内容项转义判定
+- `detectTransformKind` / `pdToJsonText`（`src/pdtransform.ts`）
+- 现有 `%` 无；QuickPick 构建在 `src/extension.ts` 抽出复用
 
 ## Steps
 
-- [ ] `src/jsonToPd.ts`：渲染器（值类型规则 + Subject 还原 + 空行规则 + 丢弃规则），`jsonToPdText` 返回 `{pd, dropped}`
-- [ ] `src/pd2json.ts` → `src/pdtransform.ts`：改名，新增 `detectTransformKind`、`resolveSection`、`isJsonFileName`
-- [ ] `src/cli.ts`：pdtransform 双向 CLI（识别 → 方向分派 → 输出；stderr 警告）
-- [ ] `src/extension.ts`：命令改名 `pdtransform` + 双向 `runPdTransform` + 警告合并弹窗 + QuickPick 序号
-- [ ] `package.json`：bin / command（id `pdtransform` + 本地化 title）/ activationEvents / description
-- [ ] 测试：`test/jsonToPd.test.ts`（含回环不变量）+ `test/pdtransform.test.ts` 改名补充
-- [ ] 文档同步：README / SPEC / TUTORIAL / skill×2 / CHANGELOG / AGENTS.md
-- [ ] 门禁：`pnpm typecheck && pnpm test && pnpm build`
+^[x] section 寻址规范：`splitSections` 增强（围栏状态 + 无标记判断）+ `nameSections` + `resolveSection`（含测试）
+^[x] expand 跨文件入口重构 + **围栏内引用展开豁免**（修复已确认 bug）
+^[x] `src/compile-cli.ts`：pdcompile CLI（多文件合并 → 选段 → 展开 → format → stdout）
+^[x] `src/format.ts`：空行规则（含幂等、围栏保护、与顶层缩进修正共存）
+^[x] `src/jsonToPd.ts`：移除空行 + 转义规则扩展
+^[x] `src/cli.ts` / `src/pdtransform.ts`：pdtransform 新参数语法 + 输出统一 format
+^[x] `src/extension.ts`：pdcompile 命令 + QuickPick 显示规则统一（%1 命名）
+^[x] `package.json` / nls：bin、命令、文案
+^[x] 测试全套 + 现有用例更新
+^[x] 文档全面更新（SPEC 寻址规范章节 + 各处语法变更）
+^[x] 门禁：typecheck + test + build + vsce package
 
 ## Verification
 
-- 单测：用户两个空行示例精确断言（`name1: value1\nname2: value2` 无空行；带子域键值间空一行）；回环不变量（所有 fixtures：pd → JSON → pd → 再 JSON，两次 JSON deepEqual）；丢弃规则各分支断言
-- 手工 CLI：`pdtransform file.pd` / `pdtransform file.pd 段名` / `pdtransform file.pd 2`（未命名多段） / `pdtransform file.json` / `pdtransform file.txt`（探针双向）/ 越界序号报错退出
-- 手工 VSCode（F5）：PD 文档执行 pdtransform → Untitled JSON；JSON 文档执行 → Untitled PD；多段 QuickPick 保留；面板输入 `pdtransform` 能搜到，条目显示两行（`Promptdown格式转换` / 灰 `.pd格式与JSON互相转换`）；带非法条目的 JSON 转换后在右下角弹警告
-- `pnpm release-all` 前门禁全绿（发布脚本不需要改——bin 映射来自 package.json）
+- `pdcompile %1 first.pd` / `pdcompile first first.pd second.pd` / 多文件跨文件引用 / 越界 / `%` 命名转义 / 数字命名 / **跨文件重名先到先得**
+- **围栏豁免回归**：围栏内 `:ref`、`//!pd`、`---`、行尾空白、全角冒号均原样（splitSections/expand/format 三层）
+- format 空行幂等；多段文件按段应用；compile 与 transform-to-pd 输出经 format 后与旧 jsonToPd 空行行为一致
+- 转义：`a: b` → `a:- b`、`a:b` → `a:-b`、`a：b` → `a：-b`，转回后仍是文本
+- VSCode：pdtransform/pdcompile QuickPick 显示 `%1 aaa`；结果新开 Untitled
+- 门禁全绿

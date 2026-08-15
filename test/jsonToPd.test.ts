@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { jsonToPdText } from "../src/jsonToPd";
+import { format } from "../src/format";
 import { expand, splitSections } from "../src/parser/expand";
 import { lex } from "../src/parser/lexer";
 import { parse } from "../src/parser/parser";
@@ -10,9 +11,9 @@ import { toJson } from "../src/parser/toJson";
 
 const FIX = join(__dirname, "fixtures");
 
-/** 解析 pd 文本（按段）→ JSON 对象 */
+/** 解析 pd 文本（按段；空段名 → 不指定，单段直接取）→ JSON 对象 */
 function toJsonObj(pd: string, section?: string): unknown {
-	const doc = parse(lex(expand(pd, section)));
+	const doc = parse(lex(expand(pd, section || undefined)));
 	assert.equal(
 		doc.errors.length,
 		0,
@@ -21,14 +22,20 @@ function toJsonObj(pd: string, section?: string): unknown {
 	return toJson(doc);
 }
 
-/** 回环：pd（按段）→ JSON → pd → JSON，两次结果必须一致 */
+/**
+ * 回环固定点：pd → JSON → pd → JSON → pd，断言两次渲染的 pd 完全一致。
+ * （冒号转义会改变内容项文本——`a: b` → `a:- b`——因此不再断言 JSON 内容相等；
+ * 渲染收敛到固定点即证明转换稳定、结构可回环。）
+ */
 function assertRoundtrip(pd: string, section?: string): string {
 	const json1 = toJsonObj(pd, section);
-	const { pd: pd2, warnings } = jsonToPdText(JSON.stringify(json1));
-	assert.deepEqual(
-		toJsonObj(pd2),
-		json1,
-		`回环失败。\npd1=${JSON.stringify(pd)}\npd2=${JSON.stringify(pd2)}\nwarnings=${JSON.stringify(warnings)}`,
+	const pd2 = format(jsonToPdText(JSON.stringify(json1)).pd);
+	const json2 = toJsonObj(pd2);
+	const pd3 = format(jsonToPdText(JSON.stringify(json2)).pd);
+	assert.equal(
+		pd2,
+		pd3,
+		`渲染未收敛。\npd1=${JSON.stringify(pd)}\npd2=${JSON.stringify(pd2)}\npd3=${JSON.stringify(pd3)}\njson2=${JSON.stringify(json2)}`,
 	);
 	return pd2;
 }
@@ -83,36 +90,38 @@ test("CodeN → 围栏（仅顶层块）", () => {
 	);
 });
 
-// ---- 空行规则（用户指定） ----
+// ---- 空行规则（用户指定；jsonToPd 已不输出空行，统一由 format 负责） ----
+
+function fmt(json: string): string {
+	return format(jsonToPdText(json).pd);
+}
 
 test("空行规则：简单键值之间不空行", () => {
 	assert.equal(
-		jsonToPdText('{"name1": "value1", "name2": "value2"}').pd,
+		fmt('{"name1": "value1", "name2": "value2"}'),
 		"name1: value1\nname2: value2",
 	);
 });
 
 test("空行规则：带子域键值后跟任何顶层内容都空一行", () => {
 	assert.equal(
-		jsonToPdText(
+		fmt(
 			'{"name1": {"Info1": ["value1", "value2"]}, "name2": {"Info1": ["value3", "value4"]}}',
-		).pd,
+		),
 		"name1:\n- value1\n- value2\n\nname2:\n- value3\n- value4",
 	);
 });
 
 test("空行规则：简单键值后不空行（即使后面是带子域键值）", () => {
 	assert.equal(
-		jsonToPdText('{"name1": "value1", "name2": {"Info1": ["value3"]}}').pd,
+		fmt('{"name1": "value1", "name2": {"Info1": ["value3"]}}'),
 		"name1: value1\nname2:\n- value3",
 	);
 });
 
 test("空行规则：带子域键值后跟文本块 → 空一行 + ---", () => {
 	assert.equal(
-		jsonToPdText(
-			'{"name1": {"Info1": ["value1"]}, "Subject1": {"Info1": ["text"]}}',
-		).pd,
+		fmt('{"name1": {"Info1": ["value1"]}, "Subject1": {"Info1": ["text"]}}'),
 		"name1:\n- value1\n\n---\ntext",
 	);
 });
@@ -229,25 +238,40 @@ test("嵌套 CodeN（深度 ≥ 2）不能作围栏 → 按命名键块渲染", 
 	);
 });
 
-test("键形内容项：第一个 `: ` 转义为 `:-`（转回后仍是文本不是键值）", () => {
+test("键形内容项：第一个冒号转义（保留后续字符）——转回后仍是文本不是键值", () => {
+	// `a: b` → `a:- b`（空格保留）；全角 `x：y` → `x：-y`；无空格 `e:f` → `e:-f`
 	assert.equal(
 		jsonToPdText('{"K": {"child": "x", "Info1": ["a: b", "ok"]}}').pd,
-		"K:\n- child: x\n- a:-b\n- ok",
+		"K:\n- child: x\n- a:- b\n- ok",
+	);
+	assert.equal(
+		jsonToPdText('{"K": {"Info1": ["x：y", "e:f"]}}').pd,
+		"K:\n- x：-y\n- e:-f",
+	);
+	// 已含 `:-` 的项整行已安全，不再转义
+	assert.equal(
+		jsonToPdText('{"K": {"Info1": ["a:- b 已转义"]}}').pd,
+		"K:\n- a:- b 已转义",
+	);
+	// 行内代码段内的冒号不转义（整体字串）
+	assert.equal(
+		jsonToPdText('{"K": {"Info1": ["用 `a: b` 写法"]}}').pd,
+		"K:\n- 用 `a: b` 写法",
 	);
 	// 裸 Subject 中非内联位置的键形项（Code1 在前，Info1 不是首条目）→ 转义
 	assert.equal(
 		jsonToPdText(
 			'{"Subject1": {"Code1": {"body": "x"}, "Info1": ["x: y", "ok"]}}',
 		).pd,
-		"```\nx\n```\nx:-y\nok",
+		"```\nx\n```\nx:- y\nok",
 	);
 	// Info1 首条目键形 → 内联还原优先（精确回环，优于转义）
 	assert.equal(
 		jsonToPdText('{"Subject1": {"Info1": ["x: y", "ok"]}}').pd,
 		"Subject1: x: y\n- ok",
 	);
-	// 空格在冒号前的条目（严格 lexer 下本就不是键值）→ 原样往返
-	assert.equal(jsonToPdText('{"K": {"Info1": ["x : y"]}}').pd, "K:\n- x : y");
+	// 空格在冒号前的条目 → 也转义（防 format 规范化成键值）
+	assert.equal(jsonToPdText('{"K": {"Info1": ["x : y"]}}').pd, "K:\n- x :- y");
 });
 
 test("丢弃：段标记/分隔线/围栏形内容项", () => {
@@ -353,5 +377,34 @@ test("回环不变量: 复杂混合（键块/围栏/Subject/子键/---）", () =
 			"结尾",
 			"简单键: 值",
 		].join("\n"),
+	);
+});
+
+// ---- 转义边界（URL / 行内代码 / 多冒号） ----
+
+test("转义：URL 内容项第一个冒号转义（防 format 拆键值）", () => {
+	assert.equal(
+		jsonToPdText('{"K": {"Info1": ["https://a.com", "ok"]}}').pd,
+		"K:\n- https:-//a.com\n- ok",
+	);
+});
+
+test("转义：行内代码在前、冒号在代码后 → 只转代码外的冒号", () => {
+	// 首项键形 → 内联（值含冒号精确回环）
+	assert.equal(
+		jsonToPdText('{"K": {"Info1": ["用 `x` 说: 好"]}}').pd,
+		"K: 用 `x` 说: 好",
+	);
+	// 非首项 → 转义代码外的第一个冒号
+	assert.equal(
+		jsonToPdText('{"K": {"child": "c", "Info1": ["用 `x` 说: 好"]}}').pd,
+		"K:\n- child: c\n- 用 `x` 说:- 好",
+	);
+});
+
+test("转义：多冒号内容项非首项只转第一个", () => {
+	assert.equal(
+		jsonToPdText('{"K": {"child": "c", "Info1": ["a: b c: d"]}}').pd,
+		"K:\n- child: c\n- a:- b c: d",
 	);
 });

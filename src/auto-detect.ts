@@ -15,14 +15,18 @@ const PD_PREFIX_RE = /^\s*\/\//;
 /**
  * 打开时检测：只扫前 maxLines 行（段标记总在文档开头附近），
  * 任一行为段标记行即判定为 pd 意图；避免全文扫描大文件。
+ * ``` 围栏内的 //!pd 行不算段标记（与 splitSections 同规则）。
  */
 export function detectPdIntent(text: string, maxLines = 50): boolean {
-	const lines = text.split(/\r?\n/, maxLines + 1);
-	const n = Math.min(lines.length, maxLines);
-	for (let i = 0; i < n; i++) {
-		if (PD_MARKER_LINE_RE.test(lines[i] as string)) return true;
-	}
-	return false;
+ const lines = text.split(/\r?\n/, maxLines + 1);
+ const n = Math.min(lines.length, maxLines);
+ let inFence = false;
+ for (let i = 0; i < n; i++) {
+  const line = lines[i] as string;
+  if (!inFence && PD_MARKER_LINE_RE.test(line)) return true;
+  if (line.trim().startsWith("```")) inFence = !inFence;
+ }
+ return false;
 }
 
 /**
@@ -30,10 +34,10 @@ export function detectPdIntent(text: string, maxLines = 50): boolean {
  * 普通文本行 / IME 输入 / 行中编辑直接跳过，避免无谓正则。
  */
 export function mayBeCommentLine(line: string): boolean {
-	return PD_PREFIX_RE.test(line);
+ return PD_PREFIX_RE.test(line);
 }
 
 /** 输入时完整判定：变更行已是 //!pd 段标记行 */
 export function isPdMarkerLine(line: string): boolean {
-	return PD_MARKER_LINE_RE.test(line);
+ return PD_MARKER_LINE_RE.test(line);
 }

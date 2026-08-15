@@ -1,4 +1,4 @@
-import { lexLine, matchKeyValue } from "./parser/lexer";
+import { lexLine, matchKeyValue, splitInlineCode } from "./parser/lexer";
 
 /**
  * JSON → pd 渲染器（`toJson` 的反向，仅接受 toJson 可产出的"规范 JSON"子集）。
@@ -95,19 +95,15 @@ function renderRoot(
 	warnings: string[],
 ): void {
 	let first = true;
-	let prevStructured = false;
 	for (const [key, value] of Object.entries(obj)) {
 		const entry: string[] = [];
 		const kind = renderRootEntry(key, value, entry, warnings);
 		if (entry.length === 0) continue; // 整条目被丢弃，不留痕迹
-		if (!first) {
-			if (prevStructured) out.push(""); // 空行规则：带子域键值后
-			if (kind === "bare") out.push("---"); // 裸块回根
-		}
+		if (!first && kind === "bare") out.push("---"); // 裸块回根
 		out.push(...entry);
 		first = false;
-		prevStructured = kind === "structured";
 	}
+	// 空行规则（带子域键值后空一行）已移入 format() 统一处理
 }
 
 function renderRootEntry(
@@ -326,10 +322,32 @@ function renderStringValue(
 }
 
 /**
+ * InfoN 内容项的第一个冒号转义（仅对 InfoN 数组内字串）：
+ * 半角 `:` → `:-`、全角 `：` → `：-`，冒号后字符保留（`: ` → `:- `）。
+ * 防自动 format 把内容项变成键值（format 会把无空格冒号/全角冒号规范化为 `: `）。
+ * 行内代码段内的冒号不转义（整体字串）；已含 `:-`/`：-` 的项整行已安全，不转。
+ * 无需要转义的冒号 → 返回 null。
+ */
+function escapeColonInItem(el: string): string | null {
+	let pos = 0;
+	for (const { code, seg } of splitInlineCode(el)) {
+		if (!code) {
+			if (seg.includes(":-") || seg.includes("：-")) return null; // 整行已转义
+			const idx = seg.search(/[：:]/);
+			if (idx !== -1) {
+				const at = pos + idx;
+				return el.slice(0, at + 1) + "-" + el.slice(at + 1); // 冒号后插 `-`，后续保留
+			}
+		}
+		pos += seg.length;
+	}
+	return null;
+}
+
+/**
  * InfoN 内容项渲染。bare=true（顶层 Subject）时输出裸文本行。
- * 键形内容（严格 lexer 下会变成键值/序列键的内容）：把第一个 `: ` 转义为 `:-`
- * （只处理这一种严格匹配，不碰其他冒号）——`a: b` → `a:-b`，转回后仍是文本不是键值；
- * 段标记/分隔线/围栏形内容仍丢弃（无法转义）。
+ * 含冒号的内容项：第一个冒号（代码段外）转义为 `:-` / `：-`（保留后续字符），
+ * 转回后仍是文本不是键值；段标记/分隔线/围栏形内容仍丢弃（无法转义）。
  */
 function renderInfoItems(
 	key: string,
@@ -360,6 +378,12 @@ function renderInfoItems(
 				warnings.push(`${loc}: 内容形似围栏标记，已丢弃`);
 				continue;
 			}
+			const escaped = escapeColonInItem(el);
+			if (escaped !== null) {
+				out.push(bare ? escaped : `${indent}- ${escaped}`);
+				continue;
+			}
+			// 无冒号：段标记/分隔线/空序列项形内容仍丢弃
 			if (bare) {
 				const kind = lexLine(el, 0).kind;
 				if (
@@ -370,16 +394,8 @@ function renderInfoItems(
 					warnings.push(`${loc}: 内容形似段标记/分隔线，已丢弃`);
 					continue;
 				}
-				if (kind === "key" || kind === "item-key") {
-					out.push(el.replace(": ", ":-")); // 第一个 `: ` → `:-`（转回后仍是文本）
-				} else {
-					out.push(el); // text / item（- 开头内容裸渲染仍归当前 Subject）
-				}
-			} else if (matchKeyValue(el)) {
-				out.push(`${indent}- ${el.replace(": ", ":-")}`);
-			} else {
-				out.push(`${indent}- ${el}`);
 			}
+			out.push(bare ? el : `${indent}- ${el}`);
 			continue;
 		}
 		if (typeof el === "number" || typeof el === "boolean" || el === null) {

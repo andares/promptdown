@@ -1,7 +1,7 @@
 {
   "name": "promptdown",
   "displayName": "promptdown",
-  "description": "极简标记语言 promptdown（.pd）：兼容 markdown 风格，可双向转换 JSON，提供 VSCode 语法高亮与 pdtransform CLI",
+  "description": "极简标记语言 promptdown（.pd）：兼容 markdown 风格，可双向转换 JSON、编译多段，提供 VSCode 语法高亮与 pdtransform/pdcompile CLI",
   "version": "0.7.0",
   "publisher": "andares",
   "license": "MIT",
@@ -12,6 +12,7 @@
     "onDidOpenTextDocument",
     "onDidChangeTextDocument",
     "onCommand:pdtransform",
+    "onCommand:pdcompile",
     "onCommand:promptdown.tab"
   ],
   "repository": {
@@ -34,6 +35,7 @@
   ],
   "bin": {
     "pdtransform": "./dist/cli.js",
+    "pdcompile": "./dist/compile-cli.js",
     "pdformat": "./dist/format-cli.js",
     "hx-install": "./scripts/hx-install.mjs",
     "wsl-install": "./scripts/wsl-install.mjs"
@@ -43,6 +45,10 @@
       {
         "command": "pdtransform",
         "title": "%pdtransform.title%"
+      },
+      {
+        "command": "pdcompile",
+        "title": "%pdcompile.title%"
       }
     ],
     "keybindings": [

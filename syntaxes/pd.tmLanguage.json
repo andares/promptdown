@@ -3,250 +3,456 @@
   "name": "promptdown",
   "scopeName": "source.pd",
   "patterns": [
-    { "include": "#code-block" },
-    { "include": "#section" },
-    { "include": "#separator" },
-    { "include": "#literal-colon" },
-    { "include": "#ref" },
-    { "include": "#key" },
-    { "include": "#info" },
-    { "include": "#item" }
+    {
+      "include": "#code-block"
+    },
+    {
+      "include": "#inline-code"
+    },
+    {
+      "include": "#section"
+    },
+    {
+      "include": "#separator"
+    },
+    {
+      "include": "#literal-colon"
+    },
+    {
+      "include": "#ref"
+    },
+    {
+      "include": "#info"
+    },
+    {
+      "include": "#key"
+    },
+    {
+      "include": "#item"
+    }
   ],
   "repository": {
+    "inline-code": {
+      "comment": "` 行内代码整体字串（markdown 风格，不支持换行）：整体漂色；内部的 :/：/- 不参与键值、引用、转义标记判定（本规则优先于 key/info/ref/literal-colon）",
+      "match": "`[^`\\n]*`",
+      "name": "markup.inline.raw.pd"
+    },
     "code-block": {
       "comment": "``` 围栏代码块：转 JSON 为 Code 对象（lang 可空，body 为整个文本）；按 lang 嵌套对应语言高亮（markdown 同款机制：include 的 scope 未安装插件时静默降级，不报错）",
       "begin": "^(\\s*)(```)",
       "end": "^\\s*```\\s*$",
       "beginCaptures": {
-        "2": { "name": "punctuation.definition.fenced.pd" }
+        "2": {
+          "name": "punctuation.definition.fenced.pd"
+        }
       },
       "endCaptures": {
-        "0": { "name": "punctuation.definition.fenced.pd" }
+        "0": {
+          "name": "punctuation.definition.fenced.pd"
+        }
       },
       "name": "markup.fenced_code.block.pd",
       "patterns": [
-        { "include": "#fenced-js" },
-        { "include": "#fenced-ts" },
-        { "include": "#fenced-json" },
-        { "include": "#fenced-jsonc" },
-        { "include": "#fenced-python" },
-        { "include": "#fenced-bash" },
-        { "include": "#fenced-html" },
-        { "include": "#fenced-css" },
-        { "include": "#fenced-yaml" },
-        { "include": "#fenced-sql" },
-        { "include": "#fenced-go" },
-        { "include": "#fenced-php" },
-        { "include": "#fenced-elixir" },
-        { "include": "#fenced-fish" },
-        { "include": "#fenced-csharp" },
-        { "include": "#fenced-rescript" },
-        { "include": "#fenced-wgsl" },
-        { "include": "#fenced-rust" },
-        { "include": "#fenced-scala" },
-        { "include": "#fenced-gleam" },
-        { "include": "#fenced-cpp" },
-        { "include": "#fenced-moonbit" },
-        { "include": "#fenced-unknown" }
+        {
+          "include": "#fenced-js"
+        },
+        {
+          "include": "#fenced-ts"
+        },
+        {
+          "include": "#fenced-json"
+        },
+        {
+          "include": "#fenced-jsonc"
+        },
+        {
+          "include": "#fenced-python"
+        },
+        {
+          "include": "#fenced-bash"
+        },
+        {
+          "include": "#fenced-html"
+        },
+        {
+          "include": "#fenced-css"
+        },
+        {
+          "include": "#fenced-yaml"
+        },
+        {
+          "include": "#fenced-sql"
+        },
+        {
+          "include": "#fenced-go"
+        },
+        {
+          "include": "#fenced-php"
+        },
+        {
+          "include": "#fenced-elixir"
+        },
+        {
+          "include": "#fenced-fish"
+        },
+        {
+          "include": "#fenced-csharp"
+        },
+        {
+          "include": "#fenced-rescript"
+        },
+        {
+          "include": "#fenced-wgsl"
+        },
+        {
+          "include": "#fenced-rust"
+        },
+        {
+          "include": "#fenced-scala"
+        },
+        {
+          "include": "#fenced-gleam"
+        },
+        {
+          "include": "#fenced-cpp"
+        },
+        {
+          "include": "#fenced-moonbit"
+        },
+        {
+          "include": "#fenced-unknown"
+        }
       ]
     },
     "fenced-js": {
       "comment": "```js / ```javascript → source.js",
       "begin": "(?=(js|javascript)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.js" }]
+      "patterns": [
+        {
+          "include": "source.js"
+        }
+      ]
     },
     "fenced-ts": {
       "comment": "```ts / ```typescript → source.ts",
       "begin": "(?=(ts|typescript)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.ts" }]
+      "patterns": [
+        {
+          "include": "source.ts"
+        }
+      ]
     },
     "fenced-json": {
       "comment": "```json → source.json",
       "begin": "(?=(json)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.json" }]
+      "patterns": [
+        {
+          "include": "source.json"
+        }
+      ]
     },
     "fenced-jsonc": {
       "comment": "```jsonc → source.json.comments",
       "begin": "(?=(jsonc)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.json.comments" }]
+      "patterns": [
+        {
+          "include": "source.json.comments"
+        }
+      ]
     },
     "fenced-python": {
       "comment": "```py / ```python → source.python",
       "begin": "(?=(py|python)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.python" }]
+      "patterns": [
+        {
+          "include": "source.python"
+        }
+      ]
     },
     "fenced-bash": {
       "comment": "```bash / ```sh / ```shell → source.shell",
       "begin": "(?=(bash|sh|shell)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.shell" }]
+      "patterns": [
+        {
+          "include": "source.shell"
+        }
+      ]
     },
     "fenced-html": {
       "comment": "```html → text.html.derivative",
       "begin": "(?=(html)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "text.html.derivative" }]
+      "patterns": [
+        {
+          "include": "text.html.derivative"
+        }
+      ]
     },
     "fenced-css": {
       "comment": "```css → source.css",
       "begin": "(?=(css)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.css" }]
+      "patterns": [
+        {
+          "include": "source.css"
+        }
+      ]
     },
     "fenced-yaml": {
       "comment": "```yaml / ```yml → source.yaml",
       "begin": "(?=(yaml|yml)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.yaml" }]
+      "patterns": [
+        {
+          "include": "source.yaml"
+        }
+      ]
     },
     "fenced-sql": {
       "comment": "```sql → source.sql",
       "begin": "(?=(sql)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.sql" }]
+      "patterns": [
+        {
+          "include": "source.sql"
+        }
+      ]
     },
     "fenced-go": {
       "comment": "```go → source.go",
       "begin": "(?=(go)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.go" }]
+      "patterns": [
+        {
+          "include": "source.go"
+        }
+      ]
     },
     "fenced-php": {
       "comment": "```php → source.php",
       "begin": "(?=(php)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.php" }]
+      "patterns": [
+        {
+          "include": "source.php"
+        }
+      ]
     },
     "fenced-elixir": {
       "comment": "```elixir / ```ex / ```exs → source.elixir",
       "begin": "(?=(elixir|ex|exs)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.elixir" }]
+      "patterns": [
+        {
+          "include": "source.elixir"
+        }
+      ]
     },
     "fenced-fish": {
       "comment": "```fish → source.fish",
       "begin": "(?=(fish)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.fish" }]
+      "patterns": [
+        {
+          "include": "source.fish"
+        }
+      ]
     },
     "fenced-csharp": {
       "comment": "```csharp / ```cs / ```c# → source.cs",
       "begin": "(?=(csharp|cs|c#)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.cs" }]
+      "patterns": [
+        {
+          "include": "source.cs"
+        }
+      ]
     },
     "fenced-rescript": {
       "comment": "```rescript / ```res / ```resi → source.rescript",
       "begin": "(?=(rescript|res|resi)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.rescript" }]
+      "patterns": [
+        {
+          "include": "source.rescript"
+        }
+      ]
     },
     "fenced-wgsl": {
       "comment": "```wgsl → source.wgsl",
       "begin": "(?=(wgsl)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.wgsl" }]
+      "patterns": [
+        {
+          "include": "source.wgsl"
+        }
+      ]
     },
     "fenced-rust": {
       "comment": "```rust / ```rs → source.rust",
       "begin": "(?=(rust|rs)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.rust" }]
+      "patterns": [
+        {
+          "include": "source.rust"
+        }
+      ]
     },
     "fenced-scala": {
       "comment": "```scala → source.scala",
       "begin": "(?=(scala)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.scala" }]
+      "patterns": [
+        {
+          "include": "source.scala"
+        }
+      ]
     },
     "fenced-gleam": {
       "comment": "```gleam → source.gleam",
       "begin": "(?=(gleam)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.gleam" }]
+      "patterns": [
+        {
+          "include": "source.gleam"
+        }
+      ]
     },
     "fenced-cpp": {
       "comment": "```cpp / ```c++ → source.cpp",
       "begin": "(?=(cpp|c\\+\\+)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.cpp" }]
+      "patterns": [
+        {
+          "include": "source.cpp"
+        }
+      ]
     },
     "fenced-moonbit": {
       "comment": "```moonbit / ```mbt → source.moonbit",
       "begin": "(?=(moonbit|mbt)(\\s*)$)",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.pd" }
+        "1": {
+          "name": "entity.name.tag.pd"
+        }
       },
       "end": "(?=^\\s*```\\s*$)",
-      "patterns": [{ "include": "source.moonbit" }]
+      "patterns": [
+        {
+          "include": "source.moonbit"
+        }
+      ]
     },
     "fenced-unknown": {
       "comment": "fallback：未列出的 lang（或空 lang）→ 无嵌套高亮",
@@ -255,24 +461,32 @@
     },
     "section": {
       "comment": "//!pd <name> 段标记（markup.heading：主题标题色 + 粗体，与 key 区分）",
-      "match": "^\\s*(//!pd)(\\s+[^\\s]+)?.*$",
+      "match": "^\\s*(//!pd)(\\s+[^\\s]+)?$",
       "captures": {
-        "1": { "name": "markup.heading.pd" },
-        "2": { "name": "entity.name.section.pd" }
+        "1": {
+          "name": "markup.heading.pd"
+        },
+        "2": {
+          "name": "entity.name.section.pd"
+        }
       }
     },
     "separator": {
       "comment": "--- 分隔线",
       "match": "^\\s*(---)\\s*$",
       "captures": {
-        "1": { "name": "punctuation.separator.pd" }
+        "1": {
+          "name": "punctuation.separator.pd"
+        }
       }
     },
     "ref": {
       "comment": ":refname 引用（前后带空格；引用名不能以 - 开头）",
       "match": "(?:^|\\s)(:[^\\s-][^\\s]*)(?=\\s|$)",
       "captures": {
-        "1": { "name": "markup.quote.pd" }
+        "1": {
+          "name": "markup.quote.pd"
+        }
       }
     },
     "literal-colon": {
@@ -281,28 +495,42 @@
       "name": "string.unquoted.pd"
     },
     "key": {
-      "comment": "键值：含 :- / ：- 的行不识别键值；严格按 `: ` 判定（键名不以空白结尾）；否则仅第一个半角冒号为分隔符",
-      "match": "^(?!.*[：:]-)(\\s*)(-\\s+)?([^\\s:](?:[^:]*[^\\s])?)(:)(?=\\s|$)",
+      "comment": "键值：含 :- / ：- 的行不识别键值；行内代码段内的冒号不参与判定（键名跳过代码段）；否则仅第一个半角冒号为分隔符",
+      "match": "^(?!.*[：:]-)(\\s*)(-\\s+)?((?:`[^`\\n]*`|[^`:])+(?:`[^`\\n]*`|[^`:\\s])?)(:)(?=\\s|$)",
       "captures": {
-        "2": { "name": "punctuation.definition.list.pd" },
-        "3": { "name": "entity.name.tag.pd" },
-        "4": { "name": "punctuation.definition.key-value.pd" }
+        "2": {
+          "name": "punctuation.definition.list.pd"
+        },
+        "3": {
+          "name": "entity.name.tag.pd"
+        },
+        "4": {
+          "name": "punctuation.definition.key-value.pd"
+        }
       }
     },
     "info": {
-      "comment": "Info 默认键（Info1/Info2...）",
-      "match": "^(?!.*[：:]-)(\\s*)(-\\s+)?(Info\\d+)(:)(?=\\s|$)",
+      "comment": "Info 默认键（Info1/Info2...）：行内代码段内的 InfoN: 不误命中",
+      "match": "^(?!.*[：:]-)(\\s*)(-\\s+)?(?:`[^`\\n]*`\\s*)*(Info\\d+)(:)(?=\\s|$)",
       "captures": {
-        "2": { "name": "punctuation.definition.list.pd" },
-        "3": { "name": "support.constant.pd" },
-        "4": { "name": "punctuation.definition.key-value.pd" }
+        "2": {
+          "name": "punctuation.definition.list.pd"
+        },
+        "3": {
+          "name": "support.constant.pd"
+        },
+        "4": {
+          "name": "punctuation.definition.key-value.pd"
+        }
       }
     },
     "item": {
       "comment": "- 序列项",
       "match": "^(\\s*)(-\\s+)",
       "captures": {
-        "2": { "name": "punctuation.definition.list.pd" }
+        "2": {
+          "name": "punctuation.definition.list.pd"
+        }
       }
     }
   }

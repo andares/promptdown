@@ -24,10 +24,11 @@
 | --- | --- |
 | 🪶 **极简** | 核心符号只有 `:`（键值/引用）与 `-`（序列标记），没有标题层级、没有复杂语法 |
 | 📦 **PD ↔ JSON 双向** | `pdtransform` CLI 自动识别输入类型：`.pd` → JSON，`.json` → pd；输出稳定、可机读 |
-| 🔗 **嵌套引用** | `:refname` 编译期内联展开，多段 `//!pd <name>` 混排复用 |
+| 🔗 **嵌套引用** | `:refname` / `:%序号` 编译期内联展开（序号引用匿名段也可用），多段 `//!pd <name>` 混排复用 |
+| 🧩 **多段编译** | `pdcompile` 跨文件合并段列表：段名 / `%序号` 寻址，隐式段 = 文件主名，引用跨文件展开编译为单份完整 pd |
 | 🎨 **VSCode 高亮** | TextMate grammar 纯声明式扩展，**无需 LSP**，零红线 |
 | ✨ **自动格式化** | CLI `pdformat` + VSCode 格式化程序，首个/后续冒号判定与顶层缩进一键规范 |
-| ⚡ **编辑器命令** | 命令面板搜 `pdtransform`（`PD格式转换` / 英文注释 `PD Transform to/from JSON`），PD ↔ JSON 双向转换；结果一律新开 Untitled 不覆盖原文，`-` 列表自动续行，序列项行按 Tab 整体缩进 |
+| ⚡ **编辑器命令** | 命令面板搜 `pdtransform`（`PD格式转换`）/ `pdcompile`（`PD编译分段`）：pd→JSON 新开 Untitled、JSON→pd 直接变更当前文档（可撤销）、编译新开 Untitled；`-` 列表自动续行，序列项行按 Tab 整体缩进 |
 | 🔍 **自动检测** | untitled / 纯文本出现 `//!pd` 段标记即自动切换 pd 语言（高亮 + 格式化，可关） |
 | 🤖 **AI 友好** | 内置 skill：看到 `//!pd` 即按 pd 格式解析 |
 | 📝 **兼容 Markdown** | 内联 `**粗体**`、`` `代码` `` 等保留原文，混输无压力 |
@@ -94,7 +95,7 @@ pdtransform output.json           # JSON → pd（输出到 stdout）
 | `key: content` | 裸键值：严格判定（键名不以空白结尾、冒号后跟空白或行尾；`a : b`、`a:b` 均不是键值）；仅第一个冒号分隔键和值；在根创建键，独立成父亲 |
 | `- key: content` | 带 `-` 键值：同裸键值的严格判定；按缩进找爸爸嵌套 |
 | `- content` / `content` | 内容行：按缩进找爸爸，压入 Info 数组 |
-| ` :refname ` | 引用：前后必须带空格，编译期内联展开 |
+| ` :refname ` / ` :%序号 ` | 引用：前后必须带空格，编译期内联展开（`%N` 序号引用匿名段也可用） |
 | `:-` / `：-` | 普通冒号标记：整行不识别键值，标记本身也不是引用 |
 
 ### 核心规则
@@ -149,18 +150,27 @@ pdtransform file.pd 任务
 ## 🖥️ CLI
 
 ```bash
-pdtransform <file> [段名|序号]
+pdtransform <file> [段名|%序号]
+pdcompile <section> <file>[...<file>]
 ```
 
 自动识别输入类型（扩展名 → 内容探针）：
 
-- **`.pd` 文件 → JSON**：单段文件可省略段名；多段必须指定——按**段名**，或 **1-based 序号**（`pdtransform file.pd 2` = 第 2 块，未命名段也能选）；段不存在/序号越界会报错退出
-- **`.json` 文件 → pd**：JSON 必须是对象；不符合 pd 规则的条目——非文本标量（数字/布尔/null）自动转文本，结构性不符合的丢弃，**逐条黄字警告**（stderr）；键形内容项（如 `a: b`）把第一个冒号后跟空格的组合转义为 `:-`，转回后仍是文本不是键值
+- **`.pd` 文件 → JSON**：单段文件可省略段名；多段必须指定——按**段名**，或 **1-based 序号**（`pdtransform file.pd %2` = 第 2 块，未命名段也能选；裸数字 `2` 是字符模式，匹配命名 `2` 的段）；段不存在/序号越界会报错退出
+- **`.json` 文件 → pd**：JSON 必须是对象；不符合 pd 规则的条目——非文本标量（数字/布尔/null）自动转文本，结构性不符合的丢弃，**逐条黄字警告**（stderr）；内容项（仅 InfoN 数组内字串）第一个冒号转义（半角 `:` → `:-`、全角 `：` → `：-`，冒号后字符保留，行内代码内不转），转回后仍是文本不是键值
 - **其他扩展名**按内容探测：含 `//!pd` 段标记 → pd；可解析为 JSON → json；都不是 → 报错退出
-- 引用（`:refname`）在编译期内联展开，支持嵌套与循环检测
+- 引用（`:refname` 或 `:%序号`）在编译期内联展开，支持嵌套与循环检测；``` 围栏内与 `` ` `` 行内代码内的引用不展开
 - 语法错误（如顶层 `-` 缩进）会带行号报错退出
 
-JSON → pd 的**空行规则**：默认无空行；唯一例外——顶层**带子域键值**后跟下一个顶层条目（键值/文本块/代码块）时，中间空一行：
+**`pdcompile` 多段编译为单份完整 pd**（section 必填，输出到 stdout）：多个文件按"文件参数顺序 → 文件内段顺序"合并为全局段列表（从 1 编号）；无 `//!pd` 的文件 = 隐式段，段名 = 文件主名；`%` 开头的段名转义为 `%%`；跨文件重名段先到先得（后出现的同名段自动匿名，只能 `%序号` 访问）：
+
+```bash
+pdcompile %1 first.pd                    # 编译第 1 个 section
+pdcompile first first.pd second.pd       # 编译 first.pd 的隐式段（段名 = 文件主名）
+pdcompile 任务 tasks.pd base.pd          # 按段名选段，跨文件引用内联展开
+```
+
+JSON → pd 的**空行规则**（已移入 format，pdformat / VSCode 格式化 / compile 输出统一生效）：默认无空行；唯一例外——顶层**带子域键值**后跟下一个顶层条目（键值/文本块/代码块）时，中间空一行：
 
 ```pd
 name1:
@@ -187,6 +197,8 @@ pdformat <file.pd> [-w|--write]   # 默认输出 stdout；-w 写回原文件
 - `:-` / `：-` 所在行不识别键值，但后续引用仍有效
 - 顶层 `-` 缩进自动修正
 - 行尾空白清理
+- `` ` `` 行内代码整体原样（内部冒号/全角冒号不处理）；``` 围栏内完全原样
+- 空行规则：顶层带子域键值后跟下一个顶层条目时空一行（多段按段应用，幂等）
 
 ## 🎨 VSCode 扩展
 
@@ -201,7 +213,7 @@ code --install-extension promptdown-<version>.vsix
 - 🏷️ 段标记 `//!pd <name>`
 - ➖ 分隔线 `---`
 - 🔑 键值 `key:` / `- key:` 与 Info 默认键
-- 🔗 引用 `:refname`
+- 🔗 引用 `:refname` / `:%序号` / `:%序号`
 - 📋 `-` 序列项
 
 扩展详情页、扩展列表和 `.pd` 语言均使用 `icons/pd-icon.png` 作为品牌图标。
@@ -223,7 +235,7 @@ code --install-extension promptdown-<version>.vsix
 - 也可右键 → **Format Document**
 - 想保存时自动格式化：设置 `"editor.formatOnSave": true`（或仅对 pd：`"[promptdown]": { "editor.formatOnSave": true }`）
 
-格式化规则与 `pdformat` CLI 一致（首个键值冒号、后续全角冒号、`:-` 普通冒号标记、顶层 `-` 缩进和行尾空白）。
+格式化规则与 `pdformat` CLI 一致（首个键值冒号、后续全角冒号、`:-` 普通冒号标记、顶层 `-` 缩进、行尾空白、行内代码/围栏保护、空行规则）。
 
 ### 📦 pdtransform 命令
 
@@ -231,12 +243,19 @@ code --install-extension promptdown-<version>.vsix
 
 > 🌐 **多语言**：命令名走 VSCode nls 本地化（`package.nls*.json`）——中文界面显示 `PD格式转换` + 灰色英文注释；英文界面自动显示 `PD Transform to/from JSON`。
 
-- **PD 文档 → JSON**：多段文件（多个 `//!pd` 段）会弹出 QuickPick 让你选择要转换的段（未命名段带 `#序号`）
-- **JSON 文档 → JSON 转换后的 pd**：不符合规则的条目（标量转文本 / 结构性丢弃）在转换结束后合并弹一次错误消息窗逐条提示
-- **结果一律新开 untitled 文件**（侧边预览打开），**无论哪个方向都绝不覆盖原文档**
+- **PD 文档 → JSON**：多段文件（多个 `//!pd` 段）会弹出 QuickPick 让你选择要转换的段，显示 `%序号 <段名>`（如 `%1 aaa`、`%2`；无 `//!pd` 的文档 = 隐式段，显示 `%1 <文件名>`）；**单段文档不弹窗直接转换**；结果**新开 untitled JSON 文件**（侧边预览打开），原文档不动
+- **JSON 文档 → pd**：**直接变更当前文档**（WorkspaceEdit 可撤销，保存由你控制），语言自动切到 promptdown 获得正确高亮；不符合规则的条目（标量转文本 / 结构性丢弃）在转换结束后弹一次错误消息窗逐条提示
 - 文档类型判断宽松：语言为 promptdown/json、文件名 `.pd`/`.json`、或内容探针（`//!pd` 段标记 / 可解析 JSON）均可
 - 无活动编辑器 / 无法识别类型 / 语法错误都会用 VSCode 通知提示，无副作用
 - **无默认快捷键**（命令面板搜 `pdtransform` 即可调出）
+
+### 🧩 pdcompile 命令
+
+命令面板搜 **`pdcompile`**（`PD编译分段` / 英文 `PD Compile Sections`）——把当前文档的选中段**编译为单份完整 pd**（引用内联展开 + 统一 format）：
+
+- 多段文档弹出 QuickPick 选段（显示规则与 pdtransform 相同：`%序号 <段名>`）
+- 单段文档不弹窗直接编译；无 `//!pd` 的文档段名 = 文件主名
+- 结果新开 untitled pd 文件（不覆盖原文）
 
 ### ⌨️ 列表续行
 
@@ -366,8 +385,9 @@ promptdown/
 ├── icons/pd-icon.png   # 扩展品牌图标 + .pd 文件图标
 ├── src/parser/          # 语法引擎（lexer → parser → toJson → expand）
 ├── src/cli.ts           # pdtransform CLI（自动识别 pd/json 双向转换）
+├── src/compile-cli.ts   # pdcompile CLI（多段编译为单份完整 pd）
 ├── src/jsonToPd.ts      # JSON → pd 渲染器
-├── src/pdtransform.ts   # 转换与识别逻辑（pdToJsonText / detectTransformKind）
+├── src/pdtransform.ts   # 转换与识别逻辑（pdToJsonText / compilePdText / detectTransformKind）
 ├── syntaxes/            # TextMate 语法高亮
 ├── docs/SPEC.md         # ⭐ 语法规范（唯一事实来源）
 ├── skill/               # AI skill（容器：promptdown/ 解析版 + pd-author/ 作者版）

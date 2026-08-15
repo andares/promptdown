@@ -1,3 +1,4 @@
+import { basename, extname } from "node:path";
 import * as vscode from "vscode";
 import { format } from "./format";
 import {
@@ -6,10 +7,10 @@ import {
 	mayBeCommentLine,
 } from "./auto-detect";
 import { jsonToPdText, type JsonToPdResult } from "./jsonToPd";
-import { splitSections } from "./parser/expand";
+import { nameSections, splitSections, type Section } from "./parser/expand";
 import {
+	compilePdText,
 	pdToJsonText,
-	resolveSectionName,
 	detectTransformKind,
 } from "./pdtransform";
 import { isListItemLine, listItemWsRun, tabUnit } from "./tab";
@@ -18,9 +19,37 @@ const PD_LANGUAGE = "promptdown";
 /** 参与自动检测的语言：无格式归属的弱语法文件（untitled/txt/log 默认即 plaintext） */
 const DETECT_LANGUAGES = new Set(["plaintext"]);
 
+/** 文件主名（去扩展名）——无 //!pd 的隐式段用它作段名；untitled 无文件名 → "" */
+function fileStemOf(doc: vscode.TextDocument): string {
+	if (doc.uri.scheme !== "file") return "";
+	return basename(doc.fileName, extname(doc.fileName));
+}
+
+/** QuickPick 显示规则：`<序号>[ <命名>]`（%1 aaa / %2）；选中值即 selector */
+function sectionPicks(
+	sections: Section[],
+): { label: string; selector: string }[] {
+	return sections.map((s, i) => ({
+		label: s.name ? `%${i + 1} ${s.name}` : `%${i + 1}`,
+		selector: `%${i + 1}`,
+	}));
+}
+
+/** 多段 → QuickPick 选段（取消返回 null）；单段直接返回（不弹） */
+async function pickSection(
+	sections: Section[],
+	placeHolder: string,
+): Promise<string | null> {
+	if (sections.length <= 1) return null;
+	const pick = await vscode.window.showQuickPick(sectionPicks(sections), {
+		placeHolder,
+	});
+	return pick ? pick.selector : null;
+}
+
 /**
  * pdtransform 命令：当前文档 PD ↔ JSON 双向转换。
- * 结果一律新开一个 Untitled（未保存）文件展示，**绝不覆盖原文档**（两个方向都是）。
+ * pd→JSON 新开 Untitled 文件（原文档不动）；JSON→pd 直接变更当前文档（可撤销）。
  */
 async function runPdTransform(): Promise<void> {
 	// ① 焦点判断：无活动编辑器 → 报错返回
@@ -44,29 +73,20 @@ async function runPdTransform(): Promise<void> {
 		);
 		return;
 	}
-	// ③ PD → JSON：多段文件弹 QuickPick 选段（带序号，未命名段也能选）
+	// ③ PD → JSON：多段文件弹 QuickPick 选段（%序号 [命名]），单段直接转
 	if (kind === "pd") {
-		const sections = splitSections(doc.getText());
-		let section: string | number | undefined;
-		if (sections.length > 1) {
-			const pick = await vscode.window.showQuickPick(
-				sections.map((s, i) => ({
-					label: s.name ? `#${i + 1} ${s.name}` : `#${i + 1} (未命名段)`,
-					index: i,
-				})),
-				{ placeHolder: "文件包含多个 //!pd 段，请选择要转换的段" },
-			);
-			if (!pick) return;
-			try {
-				section = resolveSectionName(sections, String(pick.index + 1));
-			} catch (e) {
-				vscode.window.showErrorMessage(`pdtransform: ${(e as Error).message}`);
-				return;
-			}
-		}
+		const text = doc.getText();
+		const stem = fileStemOf(doc);
+		const sections = splitSections(text);
+		nameSections(text, sections, stem);
+		const selector = await pickSection(
+			sections,
+			"文件包含多个 //!pd 段，请选择要转换的段",
+		);
+		if (selector === null && sections.length > 1) return; // 取消
 		let json: string;
 		try {
-			json = pdToJsonText(doc.getText(), section);
+			json = pdToJsonText(text, selector ?? undefined, stem);
 		} catch (e) {
 			vscode.window.showErrorMessage(`pdtransform: ${(e as Error).message}`);
 			return;
@@ -82,7 +102,8 @@ async function runPdTransform(): Promise<void> {
 		});
 		return;
 	}
-	// ⑤ JSON → PD：先转换，再新开 untitled PD 文件；警告合并弹一次错误窗
+	// ⑤ JSON → PD：直接变更当前文档（不新开文件；WorkspaceEdit 可撤销，
+	// 保存由用户控制）；语言切到 promptdown 获得正确高亮；警告合并弹一次错误窗
 	let result: JsonToPdResult;
 	try {
 		result = jsonToPdText(doc.getText());
@@ -90,17 +111,75 @@ async function runPdTransform(): Promise<void> {
 		vscode.window.showErrorMessage(`pdtransform: ${(e as Error).message}`);
 		return;
 	}
+	const pd = format(result.pd);
+	const fullRange = new vscode.Range(
+		doc.positionAt(0),
+		doc.positionAt(doc.getText().length),
+	);
+	const edit = new vscode.WorkspaceEdit();
+	edit.replace(doc.uri, fullRange, pd);
+	const applied = await vscode.workspace.applyEdit(edit);
+	if (!applied) {
+		vscode.window.showErrorMessage("pdtransform: 无法变更当前文档");
+		return;
+	}
+	if (doc.languageId !== PD_LANGUAGE) {
+		await vscode.languages.setTextDocumentLanguage(doc, PD_LANGUAGE);
+	}
+	if (result.warnings.length > 0) {
+		vscode.window.showErrorMessage(`pdtransform: ${result.warnings.join("\n")}`);
+	}
+}
+
+// ---- pdcompile 命令 ----
+
+/**
+ * pdcompile 命令：当前 PD 文档选中段 → 编译（引用内联展开 + 统一 format）
+ * 结果新开 untitled PD 文件，不覆盖原文档。
+ */
+async function runPdCompile(): Promise<void> {
+	const editor = vscode.window.activeTextEditor;
+	if (!editor) {
+		vscode.window.showErrorMessage(
+			"pdcompile: 当前没有活动编辑器，请先在编辑窗口打开 PD 文档",
+		);
+		return;
+	}
+	const doc = editor.document;
+	const text = doc.getText();
+	// 类型校验：语言/文件名/内容探针都不是 pd → 报错（防把 JSON 等文本当 pd 编译）
+	if (
+		doc.languageId !== PD_LANGUAGE &&
+		detectTransformKind(doc.fileName, text) !== "pd"
+	) {
+		vscode.window.showErrorMessage(
+			`pdcompile: 无法识别当前文档为 PD（语言: ${doc.languageId}），请先打开 PD 文档`,
+		);
+		return;
+	}
+	const stem = fileStemOf(doc);
+	const sections = splitSections(text);
+	nameSections(text, sections, stem);
+	const selector = await pickSection(
+		sections,
+		"请选择要编译的段（引用将内联展开）",
+	);
+	if (selector === null && sections.length > 1) return; // 取消
+	let pd: string;
+	try {
+		pd = compilePdText(text, selector ?? undefined, stem);
+	} catch (e) {
+		vscode.window.showErrorMessage(`pdcompile: ${(e as Error).message}`);
+		return;
+	}
 	const untitled = await vscode.workspace.openTextDocument({
 		language: PD_LANGUAGE,
-		content: result.pd,
+		content: pd,
 	});
 	await vscode.window.showTextDocument(untitled, {
 		preview: true,
 		viewColumn: vscode.ViewColumn.Beside,
 	});
-	if (result.warnings.length > 0) {
-		vscode.window.showErrorMessage(`pdtransform: ${result.warnings.join("\n")}`);
-	}
 }
 
 /**
@@ -185,14 +264,20 @@ function registerTabCommand(): vscode.Disposable {
 /**
  * promptdown 扩展入口：
  * 1. 注册文档格式化程序（promptdown 语言）
- * 2. pdtransform 命令：当前文档 PD ↔ JSON 双向转换，结果新开 untitled 文件（不覆盖原文档）
- * 3. //!pd 自动检测：untitled / 未知扩展名等弱语法文件中出现 //!pd 段标记行时，
+ * 2. pdtransform 命令：当前文档 PD ↔ JSON 双向转换（pd→JSON 新开 Untitled，JSON→pd 变更当前）
+ * 3. pdcompile 命令：选中段编译为单份完整 pd（引用内联展开 + format），新开 Untitled
+ * 4. //!pd 自动检测：untitled / 未知扩展名等弱语法文件中出现 //!pd 段标记行时，
  *    把整个文档语言切换为 promptdown（打开时 + 输入时均检测）。
  */
 export function activate(context: vscode.ExtensionContext): void {
 	// ---- pdtransform 命令 ----
 	context.subscriptions.push(
 		vscode.commands.registerCommand("pdtransform", runPdTransform),
+	);
+
+	// ---- pdcompile 命令 ----
+	context.subscriptions.push(
+		vscode.commands.registerCommand("pdcompile", runPdCompile),
 	);
 
 	// ---- Tab 键：序列项行（`-` 开头）整行右缩进，其余插入 tab ----
