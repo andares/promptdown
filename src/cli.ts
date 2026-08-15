@@ -41,7 +41,7 @@ function main(): void {
 
 	const kind = detectTransformKind(file, text);
 	if (kind === "pd") {
-		let section: string | undefined;
+		let section: string | number | undefined;
 		try {
 			section = resolveSectionName(splitSections(text), selector);
 		} catch (e) {

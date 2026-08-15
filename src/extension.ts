@@ -47,7 +47,7 @@ async function runPdTransform(): Promise<void> {
 	// ③ PD → JSON：多段文件弹 QuickPick 选段（带序号，未命名段也能选）
 	if (kind === "pd") {
 		const sections = splitSections(doc.getText());
-		let section: string | undefined;
+		let section: string | number | undefined;
 		if (sections.length > 1) {
 			const pick = await vscode.window.showQuickPick(
 				sections.map((s, i) => ({

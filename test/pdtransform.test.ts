@@ -61,6 +61,20 @@ test("sectionNames: 裸 //!pd → 空名", () => {
 	assert.deepEqual(sectionNames("//!pd\nx: 1\n"), [""]);
 });
 
+test("pdToJsonText: 两个未命名段按序号选第 2 段（回归：修复前始终解析第 1 段）", () => {
+	const text = "//!pd\n任务: 一\n\n//!pd\n任务: 二\n";
+	const json = JSON.parse(pdToJsonText(text, 2));
+	assert.deepEqual(json, { 任务: "二" });
+	assert.deepEqual(JSON.parse(pdToJsonText(text, 1)), { 任务: "一" });
+});
+
+test("pdToJsonText: 混合命名/未命名段按序号选（序号覆盖全部段）", () => {
+	const text =
+		"//!pd 甲\n任务: 甲\n\n//!pd\n任务: 未命名一\n\n//!pd\n任务: 未命名二\n";
+	assert.deepEqual(JSON.parse(pdToJsonText(text, 2)), { 任务: "未命名一" });
+	assert.deepEqual(JSON.parse(pdToJsonText(text, 3)), { 任务: "未命名二" });
+});
+
 // ---- isPdFileName：宽松 PD 文件名判断 ----
 
 test("isPdFileName: .pd 大小写不敏感", () => {
@@ -104,10 +118,15 @@ test("resolveSectionName: 数字名优先于序号", () => {
 	assert.equal(resolveSectionName(s2, "2"), "2"); // 存在名为 2 的段 → 按名字
 });
 
-test("resolveSectionName: 1-based 序号（含未命名段）", () => {
-	assert.equal(resolveSectionName(SECTIONS, "1"), "甲");
-	assert.equal(resolveSectionName(SECTIONS, "2"), "");
-	assert.equal(resolveSectionName(SECTIONS, "3"), "丙");
+test("resolveSectionName: 1-based 序号返回序号本身（未命名段同名，只能按序号区分）", () => {
+	assert.equal(resolveSectionName(SECTIONS, "1"), 1);
+	assert.equal(resolveSectionName(SECTIONS, "2"), 2);
+	assert.equal(resolveSectionName(SECTIONS, "3"), 3);
+});
+
+test("resolveSectionName: 两个未命名段选第 2 个 → 序号 2", () => {
+	const s = splitSections("//!pd\na: 1\n//!pd\nb: 2\n");
+	assert.equal(resolveSectionName(s, "2"), 2);
 });
 
 test("resolveSectionName: 越界/不存在抛错", () => {

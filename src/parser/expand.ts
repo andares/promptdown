@@ -47,7 +47,14 @@ export function splitSections(text: string): Section[] {
 	return sections;
 }
 
-function selectSection(sections: Section[], target?: string): Section {
+function selectSection(sections: Section[], target?: string | number): Section {
+	if (typeof target === "number") {
+		// 1-based 序号（未命名段同名，只能按序号区分）
+		const s = sections[target - 1];
+		if (!s)
+			throw new Error(`段不存在: 第 ${target} 块（文件共 ${sections.length} 段）`);
+		return s;
+	}
 	if (target !== undefined) {
 		const s = sections.find((x) => x.name === target);
 		if (!s) throw new Error(`段不存在: ${target}`);
@@ -171,9 +178,9 @@ function expandRefLine(
 /**
  * 选段 + 引用展开，返回展开后的 pd 文本（供 lexer/parser 使用）。
  * @param text 源文本（可含多段/混输前缀）
- * @param target 目标段名；多段时必须指定
+ * @param target 目标段：段名，或 1-based 序号（未命名段只能按序号选）；多段时必须指定
  */
-export function expand(text: string, target?: string): string {
+export function expand(text: string, target?: string | number): string {
 	const sections = splitSections(text);
 	const byName = new Map(sections.map((s) => [s.name, s]));
 	const section = selectSection(sections, target);

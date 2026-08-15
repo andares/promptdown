@@ -7,8 +7,9 @@ import { toJson } from "./parser/toJson";
 /**
  * pd 文本 → 格式化 JSON 字符串（与 CLI `pdtransform` 输出一致）。
  * 解析错误 / 多段未指定段名时抛错（message 含行号与原因）。
+ * @param section 段名，或 1-based 序号（未命名段只能按序号选）
  */
-export function pdToJsonText(text: string, section?: string): string {
+export function pdToJsonText(text: string, section?: string | number): string {
 	const expanded = expand(text, section);
 	const doc = parse(lex(expanded));
 	if (doc.errors.length > 0) {
@@ -35,21 +36,19 @@ export function sectionNames(text: string): string[] {
 }
 
 /**
- * 段选择器解析：先按段名精确匹配；匹配不上且是正整数 → 1-based 序号；
- * 都失败抛错（段不存在）。
- * 返回传给 expand 的段名；selector 省略返回 undefined（单段隐式段）。
+ * 段选择器解析：先按段名精确匹配；匹配不上且是正整数 → 1-based 序号。
+ * 返回传给 expand 的段名或序号（未命名段同名，只有序号能区分，直接传序号）；
+ * selector 省略返回 undefined（单段隐式段）。
  */
 export function resolveSectionName(
 	sections: Section[],
 	selector?: string,
-): string | undefined {
+): string | number | undefined {
 	if (selector === undefined) return undefined;
 	if (sections.some((s) => s.name === selector)) return selector;
 	if (/^\d+$/.test(selector)) {
 		const n = Number(selector);
-		if (n >= 1 && n <= sections.length) {
-			return (sections[n - 1] as Section).name;
-		}
+		if (n >= 1 && n <= sections.length) return n;
 		throw new Error(`段不存在: 第 ${n} 块（文件共 ${sections.length} 段）`);
 	}
 	throw new Error(`段不存在: ${selector}`);
