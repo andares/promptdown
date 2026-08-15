@@ -3,13 +3,16 @@ import type { PLine } from "./types";
 /**
  * `:-` / `：-` 是整行键值转义：只要出现，整行都不含键值。
  * 否则仅行内第一个半角冒号可作分隔符；其右侧不再识别键值。
- * 冒号后为行尾或空格+内容；无空格写法可先由 formatter 修正。
+ * 严格键值判定（转换非格式化，不兼容不规范写法）：
+ * 键名首字符非空白/冒号、不含冒号、不以空白结尾（`a : b` 不是键值）；
+ * 冒号后为行尾或空白+内容；`a:b` 无空格写法不是键值（可先由 formatter 修正）。
  */
 export function hasLiteralColon(s: string): boolean {
 	return s.includes(":-") || s.includes("：-");
 }
 
-function matchKeyValue(
+/** 单行键值判定（lexLine 与 jsonToPd 复用） */
+export function matchKeyValue(
 	s: string,
 ): { key: string; value: string | undefined } | null {
 	if (hasLiteralColon(s)) return null;
@@ -18,7 +21,7 @@ function matchKeyValue(
 
 	const key = s.slice(0, separator);
 	const value = s.slice(separator + 1);
-	if (!/^[^\s:][^:]*$/.test(key)) return null;
+	if (!/^[^\s:][^:]*$/.test(key) || /\s$/.test(key)) return null;
 	if (value !== "" && !/^\s+/.test(value)) return null;
 
 	return { key, value: value === "" ? undefined : value.trimStart() };

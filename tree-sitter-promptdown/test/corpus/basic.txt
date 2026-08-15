@@ -149,3 +149,39 @@ a --- b 中间分隔线不识别
   (key_value
     key: (key_name)
     value: (value (text_fragment))))
+==================
+严格键值：a : b / a:b / a:- b 均不是键值
+==================
+
+a : b
+a:b
+a:- b
+x: y:- z
+正常: 值
+
+---
+
+(document
+  (text_line)
+  (text_line)
+  (text_line)
+  (text_line)
+  (key_value
+    key: (key_name)
+    value: (value (text_fragment))))
+
+==================
+严格键值：键名内空格合法、空值合法
+==================
+
+bad key: v
+标题:
+
+---
+
+(document
+  (key_value
+    key: (key_name)
+    value: (value (text_fragment)))
+  (key_value
+    key: (key_name)))

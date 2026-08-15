@@ -71,6 +71,16 @@ test("键值仅以第一个冒号分隔，右值中的冒号原样进入 JSON", 
 	});
 });
 
+test("严格键值判定：冒号前有空格/无空格写法都不是键值（转换非格式化）", () => {
+	assert.deepEqual(fromText("a : b"), { Subject1: { Info1: ["a : b"] } });
+	assert.deepEqual(fromText("a :"), { Subject1: { Info1: ["a :"] } });
+	assert.deepEqual(fromText("a:b"), { Subject1: { Info1: ["a:b"] } });
+	assert.deepEqual(fromText("- a : b"), { Subject1: { Info1: ["a : b"] } });
+	// 标准写法与键名内空依旧有效
+	assert.deepEqual(fromText("a: b"), { a: "b" });
+	assert.deepEqual(fromText("bad key: v"), { "bad key": "v" });
+});
+
 test(":- / ：- 使整行不含键值，内容原样进入 Subject", () => {
 	assert.deepEqual(fromText("clock:- 12:30"), {
 		Subject1: { Info1: ["clock:- 12:30"] },

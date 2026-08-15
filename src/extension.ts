@@ -5,63 +5,102 @@ import {
 	isPdMarkerLine,
 	mayBeCommentLine,
 } from "./auto-detect";
-import { isPdFileName, pdToJsonText, sectionNames } from "./pd2json";
+import { jsonToPdText, type JsonToPdResult } from "./jsonToPd";
+import { splitSections } from "./parser/expand";
+import {
+	pdToJsonText,
+	resolveSectionName,
+	detectTransformKind,
+} from "./pdtransform";
 import { isListItemLine, listItemWsRun, tabUnit } from "./tab";
 
 const PD_LANGUAGE = "promptdown";
 /** 参与自动检测的语言：无格式归属的弱语法文件（untitled/txt/log 默认即 plaintext） */
 const DETECT_LANGUAGES = new Set(["plaintext"]);
 
-/** pd2json 命令：当前 PD 文档 → JSON（新开 untitled 文件，不覆盖原文档） */
-async function runPd2Json(): Promise<void> {
+/**
+ * pdtransform 命令：当前文档 PD ↔ JSON 双向转换。
+ * 结果一律新开一个 Untitled（未保存）文件展示，**绝不覆盖原文档**（两个方向都是）。
+ */
+async function runPdTransform(): Promise<void> {
 	// ① 焦点判断：无活动编辑器 → 报错返回
 	const editor = vscode.window.activeTextEditor;
 	if (!editor) {
 		vscode.window.showErrorMessage(
-			"pd2json: 当前没有活动编辑器，请先在编辑窗口打开 PD 文档",
+			"pdtransform: 当前没有活动编辑器，请先在编辑窗口打开 PD 或 JSON 文档",
 		);
 		return;
 	}
-	// ② 宽松 PD 判断：语言已识别 OR 文件名 .pd OR 内容含 //!pd 段标记（与自动检测同源）
+	// ② 方向判定：语言优先（promptdown / json）→ 文件名 → 内容探针
 	const doc = editor.document;
-	const isPd =
-		doc.languageId === PD_LANGUAGE ||
-		isPdFileName(doc.fileName) ||
-		detectPdIntent(doc.getText());
-	if (!isPd) {
+	let kind: "pd" | "json" | null = null;
+	if (doc.languageId === PD_LANGUAGE) kind = "pd";
+	else if (doc.languageId === "json" || doc.languageId === "jsonc")
+		kind = "json";
+	else kind = detectTransformKind(doc.fileName, doc.getText());
+	if (!kind) {
 		vscode.window.showErrorMessage(
-			`pd2json: 当前文档不是 PD 文档（语言: ${doc.languageId}）`,
+			`pdtransform: 无法识别当前文档类型（语言: ${doc.languageId}），需要 PD 或 JSON 文档`,
 		);
 		return;
 	}
-	// ③ 多段文件：弹 QuickPick 选段（取消则静默返回）；单段/隐式段直接跳过
-	const names = sectionNames(doc.getText());
-	let section: string | undefined;
-	if (names.length > 1) {
-		const pick = await vscode.window.showQuickPick(
-			names.map((n, i) => ({ label: n || "(未命名段)", index: i })),
-			{ placeHolder: "文件包含多个 //!pd 段，请选择要转换的段" },
-		);
-		if (!pick) return;
-		section = names[pick.index];
+	// ③ PD → JSON：多段文件弹 QuickPick 选段（带序号，未命名段也能选）
+	if (kind === "pd") {
+		const sections = splitSections(doc.getText());
+		let section: string | undefined;
+		if (sections.length > 1) {
+			const pick = await vscode.window.showQuickPick(
+				sections.map((s, i) => ({
+					label: s.name ? `#${i + 1} ${s.name}` : `#${i + 1} (未命名段)`,
+					index: i,
+				})),
+				{ placeHolder: "文件包含多个 //!pd 段，请选择要转换的段" },
+			);
+			if (!pick) return;
+			try {
+				section = resolveSectionName(sections, String(pick.index + 1));
+			} catch (e) {
+				vscode.window.showErrorMessage(`pdtransform: ${(e as Error).message}`);
+				return;
+			}
+		}
+		let json: string;
+		try {
+			json = pdToJsonText(doc.getText(), section);
+		} catch (e) {
+			vscode.window.showErrorMessage(`pdtransform: ${(e as Error).message}`);
+			return;
+		}
+		// ④ 新开 untitled JSON 文件（preview 模式 + 侧边打开，原文档不动）
+		const untitled = await vscode.workspace.openTextDocument({
+			language: "json",
+			content: json,
+		});
+		await vscode.window.showTextDocument(untitled, {
+			preview: true,
+			viewColumn: vscode.ViewColumn.Beside,
+		});
+		return;
 	}
-	// ④ 解析（错误 → showErrorMessage）
-	let json: string;
+	// ⑤ JSON → PD：先转换，再新开 untitled PD 文件；警告合并弹一次错误窗
+	let result: JsonToPdResult;
 	try {
-		json = pdToJsonText(doc.getText(), section);
+		result = jsonToPdText(doc.getText());
 	} catch (e) {
-		vscode.window.showErrorMessage(`pd2json: ${(e as Error).message}`);
+		vscode.window.showErrorMessage(`pdtransform: ${(e as Error).message}`);
 		return;
 	}
-	// ⑤ 新开 untitled JSON 文件（preview 模式 + 侧边打开，原文档不动）
 	const untitled = await vscode.workspace.openTextDocument({
-		language: "json",
-		content: json,
+		language: PD_LANGUAGE,
+		content: result.pd,
 	});
 	await vscode.window.showTextDocument(untitled, {
 		preview: true,
 		viewColumn: vscode.ViewColumn.Beside,
 	});
+	if (result.warnings.length > 0) {
+		vscode.window.showErrorMessage(`pdtransform: ${result.warnings.join("\n")}`);
+	}
 }
 
 /**
@@ -146,14 +185,14 @@ function registerTabCommand(): vscode.Disposable {
 /**
  * promptdown 扩展入口：
  * 1. 注册文档格式化程序（promptdown 语言）
- * 2. pd2json 命令：当前 PD 文档解析为 JSON，新开 untitled 文件展示（不覆盖原文档）
+ * 2. pdtransform 命令：当前文档 PD ↔ JSON 双向转换，结果新开 untitled 文件（不覆盖原文档）
  * 3. //!pd 自动检测：untitled / 未知扩展名等弱语法文件中出现 //!pd 段标记行时，
  *    把整个文档语言切换为 promptdown（打开时 + 输入时均检测）。
  */
 export function activate(context: vscode.ExtensionContext): void {
-	// ---- pd2json 命令 ----
+	// ---- pdtransform 命令 ----
 	context.subscriptions.push(
-		vscode.commands.registerCommand("promptdown.pd2json", runPd2Json),
+		vscode.commands.registerCommand("pdtransform", runPdTransform),
 	);
 
 	// ---- Tab 键：序列项行（`-` 开头）整行右缩进，其余插入 tab ----

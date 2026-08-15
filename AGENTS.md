@@ -1,7 +1,7 @@
 # promptdown Project Guidelines
 
-极简标记语言 promptdown（.pd）：兼容 markdown 风格，可单向转 JSON。
-提供 `pd2json` CLI、VSCode 语法高亮（TextMate grammar，无 LSP）与 AI skill。
+极简标记语言 promptdown（.pd）：兼容 markdown 风格，pd ↔ JSON 双向转换。
+提供 `pdtransform` CLI、VSCode 语法高亮（TextMate grammar，无 LSP）与 AI skill。
 
 ## Package Management
 
@@ -29,6 +29,7 @@
 | `pnpm test` | node:test 跑 `test/*.test.ts`（tsx 执行） |
 | `pnpm build` | tsc 编译到 `dist/` |
 | `node dist/format-cli.js <file> [-w]` | 格式化 pd 文本（发布后为 `pdformat` 命令） |
+| `node dist/cli.js <file> [段名\|序号]` | 双向转换（发布后为 `pdtransform`；自动识别 pd/json） |
 | `pnpm exec vsce package` | 生成 .vsix（或 `pnpm package`） |
 | `pnpm release <patch\|minor\|major>` | 一键发布 npm：校验 → 测试 → bump → commit+tag → publish → vsce package |
 | `pnpm release-all <patch\|minor\|major>` | npm + VSCode 一起发：npm 失败中止；npm 成功后推 GitHub + 建 Release（需 `GITHUB_TOKEN`，best-effort），vsce 失败降级为只发 npm |
@@ -38,7 +39,9 @@
 
 ```text
 src/
-├── cli.ts            # pd2json 入口（读文件 → expand → parse → toJson → 打印）
+├── cli.ts            # pdtransform 入口：自动识别 pd/json → 双向转换 → 打印
+├── jsonToPd.ts       # JSON → pd 渲染器（toJson 反向：值类型/Subject/空行/丢弃规则）
+├── pdtransform.ts    # pdToJsonText + detectTransformKind + resolveSection（段名/序号）
 └── parser/
     ├── types.ts      # PLine / Block（AST）/ PdDoc / PError
     ├── lexer.ts      # 行分类：section/separator/key/item-key/item/text/blank
@@ -53,12 +56,16 @@ src/
 ## pd 语法要点（避免误解）
 
 - **没有 `#` 标题**。核心只有 `:`（键值/引用）与 `-`（序列标记）
+- **严格键值判定**（转换非格式化，不兼容不规范写法）：键名不以空白结尾（`a : b` 不是键值）、冒号后跟空白或行尾（`a:b` 不是键值，可先由 pdformat 修正）；`:-`/`：-` 使整行不是键值
 - **折叠**：键内只有单条字串 → `"key": "value"`；多行/混排 → `{ "Info1": [...] }`
 - **Info**：无 key 内容归默认键 `Info`（数组），编号每层独立
 - **Subject**：顶层无 key 内容进匿名根 `Subject1/Subject2...`
 - **找爸爸**：裸键值行在根创建（不找爸爸）；带 `-` 行与内容行按缩进找爸爸；
   `- words` 与 `- name:` 同缩进 → 平级（words 进父级 Info）
 - **`---`**：块边界，指针回根（清掉之前所有父级）
+- **JSON→pd 空行规则**：默认无空行；唯一例外 = 顶层带子域键值后跟下一个顶层条目时空一行。
+  文本块/代码块（裸 Subject）前还要输出 `---`（只有 `---` 能把栈回根）
+- **键形内容项**（严格 lexer 下会变键值）：首项且块首 → 内联键值行还原；其余位置把第一个冒号后跟空格转义为 `:-`
 - **引用**：` :refname `（前后必须带空格），编译期内联展开；多段 `//!pd <name>` 混排
 - 顶层 `-` 不允许缩进（编译报错；format 时自动修正）
 - 对换行极不敏感：空行基本无视

@@ -160,21 +160,44 @@ bool tree_sitter_promptdown_external_scanner_scan(
 	}
 	if (!key_allowed && !text_allowed) return false;
 
-	// 读行找第一个 ':'（KEY_NAME 匹配到 ':' 含）
+	// 整行扫描找第一个半角 ':'（KEY_NAME 匹配到 ':' 含）。
+	// 严格键值判定（与 lexer 一致，转换非格式化）：
+	// - 行内任意位置出现 `:-` / `：-` → 整行转义，不是键值
+	// - 键名不以空白结尾（冒号前一个字符不是空白，如 `a : b`）
+	// - 冒号后跟空白或行尾（`a:b` 不是键）
+	// - 只认第一个半角冒号；全角冒号仅参与 `：-` 转义检测
 	bool found_colon = false;
+	bool colon_seen = false; // 第一个半角冒号已出现（无论是否成键）
+	bool literal_escape = false; // 整行出现 `:-` / `：-`
+	uint32_t prev = 0; // 冒号前一个字符（判断键名尾部空白）
 	while (!lexer->eof(lexer)) {
 		uint32_t cc = lexer->lookahead;
 		if (cc == '\n') break;
-		if (cc == ':') {
-			found_colon = true;
-			lexer->advance(lexer, false); // 消费 ':'（KEY_NAME 含冒号）
-			lexer->mark_end(lexer);
-			break;
-		}
 		lexer->advance(lexer, false);
+		if (cc == ':' || cc == 0xFF1A /* ： */) {
+			uint32_t after = lexer->eof(lexer) ? 0 : lexer->lookahead;
+			if (after == '-') {
+				literal_escape = true; // `:-` / `：-` 整行转义
+				prev = cc;
+				continue;
+			}
+			if (
+				cc == ':' &&
+				!colon_seen &&
+				!iswspace(prev) &&
+				(after == '\n' || iswspace(after))
+			) {
+				lexer->mark_end(lexer);
+				found_colon = true;
+			}
+			if (cc == ':') colon_seen = true;
+			prev = cc;
+			continue;
+		}
+		prev = cc;
 	}
 
-	if (found_colon && key_allowed) {
+	if (found_colon && !literal_escape && key_allowed) {
 		lexer->result_symbol = KEY_NAME;
 		return true;
 	}

@@ -4,7 +4,7 @@
 
 # promptdown
 
-**极简标记语言 · 兼容 Markdown 风格 · 一键转 JSON**
+**极简标记语言 · 兼容 Markdown 风格 · PD ↔ JSON 双向转换**
 
 为提示词（prompt）组织而生的 `.pd` 格式 —— 只用一个 `:` 和一个 `-`，
 就能写出结构清晰、AI 友好、可直接转 JSON 的文本。
@@ -23,11 +23,11 @@
 | | |
 | --- | --- |
 | 🪶 **极简** | 核心符号只有 `:`（键值/引用）与 `-`（序列标记），没有标题层级、没有复杂语法 |
-| 📦 **可转 JSON** | `pd2json` CLI 单向转换，输出稳定、可机读 |
+| 📦 **PD ↔ JSON 双向** | `pdtransform` CLI 自动识别输入类型：`.pd` → JSON，`.json` → pd；输出稳定、可机读 |
 | 🔗 **嵌套引用** | `:refname` 编译期内联展开，多段 `//!pd <name>` 混排复用 |
 | 🎨 **VSCode 高亮** | TextMate grammar 纯声明式扩展，**无需 LSP**，零红线 |
 | ✨ **自动格式化** | CLI `pdformat` + VSCode 格式化程序，首个/后续冒号判定与顶层缩进一键规范 |
-| ⚡ **编辑器命令** | 命令面板输入 `pd2json` 一键转 JSON（新开 Untitled 不覆盖原文），`-` 列表自动续行，序列项行按 Tab 整体缩进 |
+| ⚡ **编辑器命令** | 命令面板搜 `pdtransform`（`PD格式转换` / 英文注释 `PD Transform to/from JSON`），PD ↔ JSON 双向转换；结果一律新开 Untitled 不覆盖原文，`-` 列表自动续行，序列项行按 Tab 整体缩进 |
 | 🔍 **自动检测** | untitled / 纯文本出现 `//!pd` 段标记即自动切换 pd 语言（高亮 + 格式化，可关） |
 | 🤖 **AI 友好** | 内置 skill：看到 `//!pd` 即按 pd 格式解析 |
 | 📝 **兼容 Markdown** | 内联 `**粗体**`、`` `代码` `` 等保留原文，混输无压力 |
@@ -46,7 +46,8 @@
 
 ```bash
 npm install -g @andares/promptdown
-pd2json your-prompt.pd
+pdtransform your-prompt.pd        # pd → JSON（输出到 stdout）
+pdtransform output.json           # JSON → pd（输出到 stdout）
 ```
 
 写一个 `.pd` 文件——比如给影视 AI 描述一段分镜：
@@ -90,8 +91,8 @@ pd2json your-prompt.pd
 | --- | --- |
 | `//!pd <name>` | 段标记（可省略）：声明 pd 内容开始；多段混排实现引用 |
 | `---` | 分隔线：块边界，指针回根 |
-| `key: content` | 裸键值：仅第一个冒号分隔键和值；在根创建键，独立成父亲 |
-| `- key: content` | 带 `-` 键值：仅第一个冒号分隔键和值；按缩进找爸爸嵌套 |
+| `key: content` | 裸键值：严格判定（键名不以空白结尾、冒号后跟空白或行尾；`a : b`、`a:b` 均不是键值）；仅第一个冒号分隔键和值；在根创建键，独立成父亲 |
+| `- key: content` | 带 `-` 键值：同裸键值的严格判定；按缩进找爸爸嵌套 |
 | `- content` / `content` | 内容行：按缩进找爸爸，压入 Info 数组 |
 | ` :refname ` | 引用：前后必须带空格，编译期内联展开 |
 | `:-` / `：-` | 普通冒号标记：整行不识别键值，标记本身也不是引用 |
@@ -101,7 +102,7 @@ pd2json your-prompt.pd
 | 规则 | 说明 |
 | --- | --- |
 | 🔑 **折叠** | 键内只有单条字串 → `"key": "value"`；多行或混排 → `{ "Info1": [...] }` |
-| `:` **首个分隔** | 每行仅第一个冒号有键值语义；后续冒号不会再开启键值，` :ref ` 仍按引用规则处理 |
+| `:` **首个分隔** | 严格键值判定：键名不以空白结尾、冒号后跟空白或行尾；每行仅第一个冒号有键值语义；后续冒号不会再开启键值，` :ref ` 仍按引用规则处理 |
 | `:-` **普通冒号** | 行内出现 `:-` 或 `：-` 时整行不含键值，但不影响后续引用 |
 | 📋 **Info** | 无 key 内容归默认键 `Info`（数组），编号每层独立（Info1/Info2...） |
 | 🗂️ **Subject** | 顶层无 key 内容进匿名根 `Subject1/Subject2...` |
@@ -129,7 +130,7 @@ pd2json your-prompt.pd
 ```
 
 ```bash
-pd2json file.pd 任务
+pdtransform file.pd 任务
 ```
 
 ```json
@@ -148,12 +149,30 @@ pd2json file.pd 任务
 ## 🖥️ CLI
 
 ```bash
-pd2json <file.pd> [段名]
+pdtransform <file> [段名|序号]
 ```
 
-- 单段文件可省略段名；多段必须指定（`//!pd <name>` 的 name）
-- 引用在编译期内联展开，支持嵌套与循环检测
+自动识别输入类型（扩展名 → 内容探针）：
+
+- **`.pd` 文件 → JSON**：单段文件可省略段名；多段必须指定——按**段名**，或 **1-based 序号**（`pdtransform file.pd 2` = 第 2 块，未命名段也能选）；段不存在/序号越界会报错退出
+- **`.json` 文件 → pd**：JSON 必须是对象；不符合 pd 规则的条目——非文本标量（数字/布尔/null）自动转文本，结构性不符合的丢弃，**逐条黄字警告**（stderr）；键形内容项（如 `a: b`）把第一个冒号后跟空格的组合转义为 `:-`，转回后仍是文本不是键值
+- **其他扩展名**按内容探测：含 `//!pd` 段标记 → pd；可解析为 JSON → json；都不是 → 报错退出
+- 引用（`:refname`）在编译期内联展开，支持嵌套与循环检测
 - 语法错误（如顶层 `-` 缩进）会带行号报错退出
+
+JSON → pd 的**空行规则**：默认无空行；唯一例外——顶层**带子域键值**后跟下一个顶层条目（键值/文本块/代码块）时，中间空一行：
+
+```pd
+name1:
+- value1
+- value2
+
+name2:
+- value3
+- value4
+```
+
+> 文本块/代码块（匿名 Subject）前还会输出 `---` 分隔线——pd 语法里只有 `---` 能把内容从上一个键块中分离出来。
 
 ### ✨ 格式化
 
@@ -206,15 +225,18 @@ code --install-extension promptdown-<version>.vsix
 
 格式化规则与 `pdformat` CLI 一致（首个键值冒号、后续全角冒号、`:-` 普通冒号标记、顶层 `-` 缩进和行尾空白）。
 
-### 📦 pd2json 命令
+### 📦 pdtransform 命令
 
-`Ctrl+Shift+P` 打开命令面板，输入 **`pd2json`** 回车，即可把当前 PD 文档解析为 JSON：
+`Ctrl+Shift+P` 打开命令面板，输入 **`pdtransform`**（面板条目：`PD格式转换` / 灰色注释 `PD Transform to/from JSON`）回车，即可把当前文档在 PD 与 JSON 之间转换：
 
-- 结果输出到**新开的 untitled JSON 文件**（侧边预览打开），**不会覆盖原文档**
-- 多段文件（多个 `//!pd` 段）会弹出 QuickPick 让你选择要转换的段
-- PD 判断宽松：语言为 promptdown、文件名 `.pd`、或内容含 `//!pd` 段标记均可
-- 无活动编辑器 / 非 PD 文档 / 语法错误都会用 VSCode 通知提示，无副作用
-- **无默认快捷键**（命令面板搜索 `pd2json` 即可调出）
+> 🌐 **多语言**：命令名走 VSCode nls 本地化（`package.nls*.json`）——中文界面显示 `PD格式转换` + 灰色英文注释；英文界面自动显示 `PD Transform to/from JSON`。
+
+- **PD 文档 → JSON**：多段文件（多个 `//!pd` 段）会弹出 QuickPick 让你选择要转换的段（未命名段带 `#序号`）
+- **JSON 文档 → JSON 转换后的 pd**：不符合规则的条目（标量转文本 / 结构性丢弃）在转换结束后合并弹一次错误消息窗逐条提示
+- **结果一律新开 untitled 文件**（侧边预览打开），**无论哪个方向都绝不覆盖原文档**
+- 文档类型判断宽松：语言为 promptdown/json、文件名 `.pd`/`.json`、或内容探针（`//!pd` 段标记 / 可解析 JSON）均可
+- 无活动编辑器 / 无法识别类型 / 语法错误都会用 VSCode 通知提示，无副作用
+- **无默认快捷键**（命令面板搜 `pdtransform` 即可调出）
 
 ### ⌨️ 列表续行
 
@@ -343,7 +365,9 @@ pnpm release patch -- --dry-run   # 先预览计划
 promptdown/
 ├── icons/pd-icon.png   # 扩展品牌图标 + .pd 文件图标
 ├── src/parser/          # 语法引擎（lexer → parser → toJson → expand）
-├── src/cli.ts           # pd2json CLI
+├── src/cli.ts           # pdtransform CLI（自动识别 pd/json 双向转换）
+├── src/jsonToPd.ts      # JSON → pd 渲染器
+├── src/pdtransform.ts   # 转换与识别逻辑（pdToJsonText / detectTransformKind）
 ├── syntaxes/            # TextMate 语法高亮
 ├── docs/SPEC.md         # ⭐ 语法规范（唯一事实来源）
 ├── skill/               # AI skill（容器：promptdown/ 解析版 + pd-author/ 作者版）
