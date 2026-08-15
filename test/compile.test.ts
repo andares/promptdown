@@ -173,8 +173,7 @@ test("compilePdText: :%N 循环引用静默擦除", () => {
 });
 
 test("compilePdText: 循环与正常引用混一行（循环擦掉、正常展开）", () => {
-	const text =
-		"//!pd a\nA: :b :x\n//!pd b\nB: :a\n//!pd x\n正常内容\n";
+	const text = "//!pd a\nA: :b :x\n//!pd b\nB: :a\n//!pd x\n正常内容\n";
 	assert.equal(compilePdText(text, "a"), "A:\n- B:\n- 正常内容");
 });
 
