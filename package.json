@@ -135,7 +135,9 @@
     "tag-current": "node ./scripts/tag-current.mjs",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "wsl-install": "node ./scripts/wsl-install.mjs",
-    "hx-install": "node ./scripts/hx-install.mjs"
+    "hx-install": "node ./scripts/hx-install.mjs",
+    "perf": "tsx perf/bench.ts",
+    "perf:gen": "tsx perf/gen-suite.ts"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

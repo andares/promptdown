@@ -19,3 +19,4 @@ pnpm-workspace.yaml
 !scripts/
 scripts/publish.mjs
 scripts/tag-current.mjs
+perf/

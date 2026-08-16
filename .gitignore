@@ -18,3 +18,6 @@ icons/concepts/
 .env
 .env.*
 !.env.example
+
+# 性能测试生成物（perf/bench.ts 运行时生成）
+perf/generated/
