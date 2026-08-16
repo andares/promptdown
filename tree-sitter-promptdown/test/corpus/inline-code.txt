@@ -1,0 +1,42 @@
+==================
+行内代码内冒号不参与键值判定
+==================
+
+`a: b` 说明
+
+---
+
+(document
+  (text_line))
+
+==================
+行内代码内 :- 不触发整行转义
+==================
+
+msg: 看 `x:- y` 写法和 z: ok
+
+---
+
+(document
+  (key_value
+    key: (key_name)
+    value: (value
+      (text_fragment)
+      (text_fragment)
+      (text_fragment)
+      (text_fragment)
+      (text_fragment)
+      (text_fragment))))
+
+==================
+行内代码配对后冒号正常判键值
+==================
+
+msg: `a: b` 内容
+
+---
+
+(document
+  (key_value
+    key: (key_name)
+    value: (value (text_fragment) (text_fragment) (text_fragment))))

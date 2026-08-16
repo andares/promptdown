@@ -27,6 +27,7 @@
 | --- | --- |
 | `pnpm typecheck` | `tsc --noEmit` 类型检查 |
 | `pnpm test` | node:test 跑 `test/*.test.ts`（tsx 执行） |
+| `pnpm perf` | 性能基准（10 副本样本 2099 行/150 段；`pnpm perf:gen [份数]` 重新生成，产物 `perf/generated/` 不入库） |
 | `pnpm build` | tsc 编译到 `dist/` |
 | `node dist/format-cli.js <file> [-w]` | 格式化 pd 文本（发布后为 `pdformat` 命令） |
 | `node dist/cli.js <file> [段名\|%序号]` | 双向转换（发布后为 `pdtransform`；自动识别 pd/json） |
@@ -72,6 +73,7 @@ src/
 - **引用**：` :refname ` 或 ` :%序号 `（前后必须带空格），编译期内联展开；`%N` 序号引用匿名段也可用；多段 `//!pd <name>` 混排；``` 围栏内与行内代码内不展开
 - **section 寻址**：`%N` = 全局 1-based 序号；否则字符模式匹配 `//!pd <name>`（数字命名也是字符）；`%` 开头的段名转义 `%%`；隐式段（无 `//!pd`）= 文件主名；裸 `//!pd` 匿名段只能 `%N`；跨文件重名先到先得
 - **行内代码**（`` ` ``）：配对整体字串，不支持换行；内部 `:`/`：`/`-` 不参与键值/序列/`:-` 转义/引用判定，format 与 jsonToPd 转义均豁免
+- **多端一致性**：TextMate 与 tree-sitter 为显示层（语义以 TS 核心为准）；tree-sitter 有降级项（SECTION/SEPARATOR 整行锚定、ref 前后空格约束、行内代码漂色缺失——外部 scanner 无法回退字符 + 正则无 lookahead），差异表见 README「多端一致性」；语法改动需同步四端 + 更新差异表
 - 顶层 `-` 不允许缩进（编译报错；format 时自动修正）
 - 对换行极不敏感：空行基本无视
 

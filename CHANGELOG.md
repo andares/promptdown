@@ -18,6 +18,9 @@
 - **内容项转义扩展**：第一个冒号转义（半角 `:` → `:-`、全角 `：` → `：-`，冒号后字符保留，行内代码内不转），防自动 format 把内容项变键值
 - VSCode 新增 `pdcompile` 命令（`PD编译分段` / 英文 `PD Compile Sections`）；QuickPick 统一显示 `%序号 <段名>`（如 `%1 aaa`）；单段文档不弹窗直接转换
 - VSCode 转换行为分方向：pd→JSON 新开 Untitled（原文档不动）；JSON→pd 直接变更当前文档（可撤销、语言自动切 promptdown）；pdcompile 新开 Untitled
+- 多端规则同步：tree-sitter 补齐行内代码豁免（内部冒号/`:-` 不参与键值判定）；SECTION/SEPARATOR 整行锚定与 ref 空格约束等无法实施项降级标注（README「多端一致性」章节 + SPEC/skill 注明）
+- 性能基准：`pnpm perf`（perf/bench.ts）——10 副本样本（2099 行/150 段）全链路 <10ms（format 最重 ~9.4ms）；`pnpm perf:gen` 重新生成样本
+- 1.0 规划：docs/ROADMAP-1.0.md（API 冻结声明、全端对齐确认计划、0.9 输入框组件 → 稳定期 → 1.0 节奏）
 
 ## 0.7.0 (未发布)
 

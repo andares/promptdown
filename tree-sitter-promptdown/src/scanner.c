@@ -137,13 +137,22 @@ bool tree_sitter_promptdown_external_scanner_scan(
 		// "-x"：位置在 x 处，继续通用
 	}
 
-	// 3. ``` 围栏行
+	// 3. ``` 围栏行（探测：不足 3 个反引号 → 整行按文本行处理，
+	//    与 TS 核心一致——`` `a: b` `` 是文本不是键值；已消费的字符无法回退，
+	//    故直接消费到行尾）
 	if (c == '`' && valid_symbols[FENCE]) {
 		if (match_prefix(lexer, "```", 3)) {
 			consume_to_eol(lexer);
 			lexer->result_symbol = FENCE;
 			return true;
 		}
+		// 单个/两个反引号开头（非围栏）：整行当文本
+		if (valid_symbols[TEXT_LINE] && valid_symbols[ITEM_DASH] && line_start) {
+			consume_to_eol(lexer);
+			lexer->result_symbol = TEXT_LINE;
+			return true;
+		}
+		return false;
 	}
 
 	// 4. 通用：KEY_NAME（仅行首且行内有 ':'）或 TEXT_LINE（仅行首 + _line 起始）
@@ -166,14 +175,26 @@ bool tree_sitter_promptdown_external_scanner_scan(
 	// - 键名不以空白结尾（冒号前一个字符不是空白，如 `a : b`）
 	// - 冒号后跟空白或行尾（`a:b` 不是键）
 	// - 只认第一个半角冒号；全角冒号仅参与 `：-` 转义检测
+	// - 行内代码（`...` 配对）段内：冒号/`:-` 不参与判定（与 lexer 一致）；
+	//   未闭合反引号（行尾仍 in_code）在显示层按普通字符近似（降级：与 lexer 有边缘差异）
 	bool found_colon = false;
 	bool colon_seen = false; // 第一个半角冒号已出现（无论是否成键）
 	bool literal_escape = false; // 整行出现 `:-` / `：-`
+	bool in_code = false; // 反引号配对状态（代码段内字符不参与判定）
 	uint32_t prev = 0; // 冒号前一个字符（判断键名尾部空白）
 	while (!lexer->eof(lexer)) {
 		uint32_t cc = lexer->lookahead;
 		if (cc == '\n') break;
 		lexer->advance(lexer, false);
+		if (cc == '`') {
+			in_code = !in_code;
+			prev = cc;
+			continue;
+		}
+		if (in_code) {
+			prev = cc;
+			continue; // 代码段内：冒号/`:-` 不参与键值/转义判定
+		}
 		if (cc == ':' || cc == 0xFF1A /* ： */) {
 			uint32_t after = lexer->eof(lexer) ? 0 : lexer->lookahead;
 			if (after == '-') {

@@ -1,7 +1,7 @@
 {
   "name": "tree-sitter-promptdown",
   "version": "0.1.0",
-  "description": "promptdown (.pd) grammar for tree-sitter — used by helix (and neovim)",
+  "description": "promptdown (.pd) grammar for tree-sitter — used by helix (and neovim). 显示层降级项（SECTION/SEPARATOR 锚定、ref 空格约束）见主 README「多端一致性」",
   "main": "bindings/node",
   "scripts": {
     "generate": "tree-sitter generate",
