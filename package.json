@@ -2,7 +2,7 @@
   "name": "promptdown",
   "displayName": "promptdown",
   "description": "极简标记语言 promptdown（.pd）：兼容 markdown 风格，可双向转换 JSON、编译多段，提供 VSCode 语法高亮与 pdtransform/pdcompile CLI",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "publisher": "andares",
   "license": "MIT",
   "icon": "icons/pd-icon.png",
