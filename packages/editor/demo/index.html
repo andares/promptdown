@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>@andares/pdeditor demo</title>
+		<style>
+			/* 极简测试页样式：高亮 token 配色 + 输入框布局（headless 组件零样式，样式由外部定义） */
+			body {
+				font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+				margin: 24px;
+				background: #1e1e1e;
+				color: #d4d4d4;
+			}
+			h1 {
+				font-size: 16px;
+				color: #9cdcfe;
+			}
+			.toolbar {
+				margin-bottom: 12px;
+				display: flex;
+				gap: 8px;
+				align-items: center;
+			}
+			.toolbar select,
+			.toolbar button {
+				background: #333;
+				color: #d4d4d4;
+				border: 1px solid #555;
+				padding: 4px 10px;
+				border-radius: 4px;
+				font-size: 13px;
+				cursor: pointer;
+			}
+			.toolbar span {
+				font-size: 12px;
+				color: #888;
+			}
+
+			/* 输入框容器（外部框架定义布局）—— headless 核心挂载到这里 */
+			.editor-box {
+				border: 1px solid #444;
+				border-radius: 6px;
+				background: #252526;
+				overflow: hidden;
+				min-height: 260px;
+			}
+			/* pd 高亮 token 配色（与 TextMate scope 对应） */
+			.pd-key {
+				color: #9cdcfe;
+			}
+			.pd-key-punct {
+				color: #d4d4d4;
+			}
+			.pd-item {
+				color: #569cd6;
+			}
+			.pd-section {
+				color: #c586c0;
+			}
+			.pd-sep {
+				color: #569cd6;
+			}
+			.pd-ref {
+				color: #ce9178;
+			}
+			.pd-inline-code {
+				color: #dcdcaa;
+				background: #2d2d30;
+				border-radius: 3px;
+			}
+			.pd-fence {
+				color: #6a9955;
+			}
+			/* Prism token（md/xml/json/yaml） */
+			.token.comment,
+			.token.prolog,
+			.token.doctype {
+				color: #6a9955;
+			}
+			.token.string,
+			.token.attr-value {
+				color: #ce9178;
+			}
+			.token.keyword,
+			.token.operator,
+			.token.tag {
+				color: #569cd6;
+			}
+			.token.number,
+			.token.boolean {
+				color: #b5cea8;
+			}
+			.token.punctuation {
+				color: #d4d4d4;
+			}
+			.token.function,
+			.token.property {
+				color: #dcdcaa;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>@andares/pdeditor — headless 输入框 demo</h1>
+		<div class="toolbar">
+			<select id="lang">
+				<option value="pd" selected>pd</option>
+				<option value="md">md</option>
+				<option value="xml">xml</option>
+				<option value="json">json</option>
+				<option value="yaml">yaml</option>
+			</select>
+			<button id="fmt">格式化（pd）</button>
+			<span id="status"></span>
+		</div>
+		<div id="editor" class="editor-box"></div>
+		<script type="module" src="./main.ts"></script>
+	</body>
+</html>

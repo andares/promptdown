@@ -1,0 +1,9 @@
+# 组件包发布内容控制（files: ["dist"] 已限定 dist + 自动含 README/package.json；
+# files 白名单优先于 .npmignore，dist 内文件无法在此排除）
+# 开发产物不入包
+node_modules/
+test/
+demo/
+src/
+vite.config.ts
+tsconfig.json

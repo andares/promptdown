@@ -1,0 +1,39 @@
+{
+  "name": "@andares/pdeditor",
+  "version": "0.1.0",
+  "description": "Headless prompt 输入框组件（基于 Yace）：pd/md/xml/json/yaml 语法高亮，语言切换为 API 行为，无 UI 假设",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build && tsc --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "vite demo",
+    "build:demo": "vite build --config vite.demo.config.ts",
+    "build:editor": "pnpm build && pnpm build:demo"
+  },
+  "dependencies": {
+    "@types/prismjs": "^1.26.6",
+    "es-toolkit": "^1.51.0",
+    "prismjs": "^1.29.0",
+    "yace": "^1.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}
