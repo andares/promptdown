@@ -17,7 +17,7 @@ npm install @andares/pdeditor
 
 ## 入口选择与 tree-shaking
 
-同一个包两个入口，**选择入口即完成裁剪**——两个产物都是预打包自包含单文件（无运行时依赖，`sideEffects: false`），消费方的 bundler 不需要也不需要做模块级摇树：
+同一个包两个入口，**选择入口即完成裁剪**——两个产物都是预打包自包含单文件（无运行时依赖，`sideEffects: false`），消费方的 bundler 无需做模块级摇树：
 
 | 入口 | import | 内置高亮 | 产物体积（min 前 / gzip） | 适用 |
 | --- | --- | --- | --- | --- |
