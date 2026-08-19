@@ -15,6 +15,25 @@
 npm install @andares/pdeditor
 ```
 
+## 入口选择与 tree-shaking
+
+同一个包两个入口，**选择入口即完成裁剪**——两个产物都是预打包自包含单文件（无运行时依赖，`sideEffects: false`），消费方的 bundler 不需要也不需要做模块级摇树：
+
+| 入口 | import | 内置高亮 | 产物体积（min 前 / gzip） | 适用 |
+| --- | --- | --- | --- | --- |
+| 全量（默认） | `@andares/pdeditor` | pd（自研）+ md/xml/json/yaml（Prism） | ~84 kB / ~23 kB | 需要多语言内置高亮 |
+| pd-only 精简 | `@andares/pdeditor/pd` | 仅 pd；其余语言纯文本渲染（功能完好） | ~17 kB / ~5.5 kB | 只用 pd（多数宿主场景） |
+
+```ts
+// pd-only：不把 Prism（~80 kB）打进你的 bundle
+import { createPdEditor } from "@andares/pdeditor/pd";
+```
+
+- 两个入口的 API 完全一致（同一 `createPdEditor` 工厂，仅内置高亮管线不同）
+- pd-only 入口下 `setLanguage("md")` 不报错：内容以纯文本渲染，无高亮
+- 任何时候都可用 `options.highlight` 自带高亮器（BYO）覆盖内置管线——精简入口 + BYO 即可按需补其它语言
+- 消费验证：vite 项目引 `/pd` 入口构建产物 ~13 kB（gzip ~4.7 kB）、无 Prism 痕迹；包无任何 runtime 依赖（yace/prismjs/es-toolkit 均已内联进 dist，仅开发期使用）
+
 ## 用法
 
 ```ts

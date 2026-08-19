@@ -384,7 +384,7 @@ pd 语法在四端实现，语义以 **TS 核心**（`src/parser/*`，解析/转
 
 ## 🛠️ 开发
 
-- **Web 输入框组件**：`packages/editor/`（@andares/pdeditor）——headless 提示词输入框（pd/md/xml/json/yaml 高亮），基于 Yace；`pnpm --filter @andares/pdeditor dev` 起 demo
+- **Web 输入框组件**：[packages/editor/](https://github.com/andares/promptdown/tree/master/packages/editor)（npm 包 @andares/pdeditor）——headless 提示词输入框（pd/md/xml/json/yaml 高亮），基于 Yace；含 pd-only 精简入口（`@andares/pdeditor/pd`，不含 Prism，~17 kB）；`pnpm --filter @andares/pdeditor dev` 起 demo
 - **性能基准**：`pnpm perf`（10 副本样本 2099 行/150 段全链路基准）；`pnpm perf:gen [份数]` 重新生成样本（`perf/generated/` 不入库）
 - **1.0 路线**：见 [`docs/ROADMAP-1.0.md`](docs/ROADMAP-1.0.md)（API 冻结声明 + 全端对齐确认 + 发布节奏）
 

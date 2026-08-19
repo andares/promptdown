@@ -10,30 +10,35 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./pd": {
+      "types": "./dist/pd.d.ts",
+      "import": "./dist/pd.js",
+      "require": "./dist/pd.cjs"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "vite build && tsc --emitDeclarationOnly",
+    "build": "vite build && vite build --config vite.pd.config.ts && tsc --emitDeclarationOnly",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "vite demo",
     "build:demo": "vite build --config vite.demo.config.ts",
     "build:editor": "pnpm build && pnpm build:demo"
   },
-  "dependencies": {
+  "devDependencies": {
     "@types/prismjs": "^1.26.6",
     "es-toolkit": "^1.51.0",
-    "prismjs": "^1.29.0",
-    "yace": "^1.0.0"
-  },
-  "devDependencies": {
     "jsdom": "^26.0.0",
+    "prismjs": "^1.29.0",
     "vite": "^6.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "yace": "^1.0.0"
   }
 }

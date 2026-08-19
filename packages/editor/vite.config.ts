@@ -1,7 +1,9 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
 
-// 库模式构建：ESM（index.js）+ CJS（index.cjs）+ d.ts（tsc 单独输出）
+// 库模式构建：全量入口（index.js/index.cjs，含 Prism）。双入口体系：
+// 本配置先跑（emptyOutDir:true 清空 dist），vite.pd.config.ts 后跑追加 pd-only 产物；
+// d.ts 由 tsc --emitDeclarationOnly 按模块输出（index/pd/core/... 各自一份）。
 export default defineConfig({
 	build: {
 		lib: {
