@@ -4,3 +4,6 @@ allowBuilds:
   keytar: false
 minimumReleaseAgeExclude:
   - tsx@4.23.12
+
+packages:
+  - packages/*

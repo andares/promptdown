@@ -35,6 +35,7 @@
 | `pnpm exec vsce package` | 生成 .vsix（或 `pnpm package`） |
 | `pnpm release <patch\|minor\|major>` | 一键发布 npm：校验 → 测试 → bump → commit+tag → publish → vsce package |
 | `pnpm release-all <patch\|minor\|major>` | npm + VSCode 一起发：npm 失败中止；npm 成功后推 GitHub + 建 Release（需 `GITHUB_TOKEN`，best-effort），vsce 失败降级为只发 npm |
+| `pnpm release-editor <patch\|minor\|major>` | 发布组件包 `@andares/pdeditor`（packages/editor）：sync → 组件门禁 → bump → commit+tag → publish → push + GitHub Release（逻辑同主包 publish.mjs，无 vsce；`--dry-run` 预览） |
 | `pnpm tag-current` | 给当前版本打本地 tag `vX.Y.Z`（已存在则跳过，不推送） |
 
 ## Architecture
@@ -97,10 +98,38 @@ src/
 `pnpm tag-current` 可独立使用：给当前 HEAD 打本地 `v{version}` tag（已存在则跳过），**只打 tag 不推送**。
 
 **npm 包名与仓库名不同**：npm registry 上 `promptdown` 已被他人占用（相似度保护会拒绝近似名），
-所以发布 npm 时脚本切换为 scoped 名 **`@andares/promptdown`**（`--access=public`），发布后恢复为
-`promptdown`（vsce 需要非 scoped 名，扩展 ID 为 `andares.promptdown`）。安装命令：`npm install -g @andares/promptdown`。
+发布 npm 用 `package.json` 的 **`publishConfig.name`** 声明 scoped 名 **`@andares/promptdown`**（`--access=public`），
+脚本不再临时改包名；`package.json` 的 `name` 保持 `promptdown`（vsce 需要非 scoped 名，扩展 ID 为 `andares.promptdown`）。
+安装命令：`npm install -g @andares/promptdown`。
 
 发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`
+
+## Web 输入框组件（@andares/pdeditor，headless 优先）
+
+### 当前目标（已实现 v0.1，见 packages/editor/）
+
+基于 **Yace**（<https://github.com/petersolopov/yace，~2KB、零依赖、BYO> highlighter）的 **headless 提示词输入框** `@andares/pdeditor`：
+
+- **形态**：纯背后控制，只渲染输入框内容 + 提供 API（`createPdEditor`，含 `setLanguage/setValue/getValue/destroy`）；无 UI chrome，核心维护 textarea/pre 覆盖层排版不变量，外部定义容器外观与 token 配色
+- **语言切换是 API 行为**（非 UI 切换器）：pd / md / xml / json / yaml（Prism 提供后四种）
+- **不是富文本**：pd 是纯代码文本，要精确不要样式——高亮服务于精确；排除富文本引擎（ProseMirror/Lexical/Slate）与 CM6/Monaco 本体
+- **不依赖主包**（避免包名耦合——主包文件内 name 为 promptdown、npm 发布名为 @andares/promptdown）：pd 高亮 tokenizer 在组件内自研（语义与 `src/parser/lexer.ts` 一致，见 `packages/editor/src/inline.ts`）；依赖主包语义工具（format/转换/段解析）属成品层未来方向
+- **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 测试 28 用例）
+- **demo 页**：`packages/editor/demo/`（vite dev 验证高亮/语言切换/中文 IME）
+- 插件（yace 内置）：Tab 缩进 + 续行缩进默认启用
+
+### 未来可选方向（不在本期实现）
+
+- **成品输入框**（headless 核心 + UI 层）：格式切换器（复用 detectTransformKind）、Ctrl+G 放大模式（大输入切 CM6 专用编辑器）、历史记录（localStorage/IndexedDB）、工具栏（格式化/转 JSON/段大纲）
+- 主题系统（CSS 变量，参考 synesthesia）
+- 移动端/触屏适配、协同（Yjs）
+
+## Git 权限边界（强约束）
+
+- **agent 的 git 操作权限仅限 `git commit`（及本地 stash/reset 等纯本地操作）**
+- **禁止 `git push`**（任何分支、任何 tag）；**禁止 `pnpm release*` 与 `npm publish`**（release / release-all / release-editor 一律禁止，包括手动把包发上 npmjs.com 的步骤）
+- 推送与发版（npm + VSCode + GitHub Release）由**用户本人操作**；用户说“提交”时 agent 只执行 commit（可多分 commit，符合 conventional commits），不再多问，也不附带任何 push/release
+- 本地 tag（`pnpm tag-current`）可打可不打，但**不得 push tag**
 
 ## Conventions
 
@@ -111,4 +140,5 @@ src/
 - 格式化规则（src/format.ts）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
 - **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
 - 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release` / `pnpm release-all`
+- **editor 功能改动后必须重建 demo**：`packages/editor/` 的 `src/` 或 `demo/` 有任何改动后，必须重新构建预构建 demo——`pnpm --filter @andares/pdeditor build:demo`（或一步到位 `build:editor` = lib build + demo build），保证 `demo-dist/` 与源码同步（demo-dist 是本地产物，gitignored 不入库，但用户直接打开它查看效果，旧产物会误导）
 - `.npmignore` 控制发布内容（pnpm 复用 npm 的发布文件机制，勿删）；新增发布文件记得检查它

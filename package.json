@@ -137,7 +137,8 @@
     "wsl-install": "node ./scripts/wsl-install.mjs",
     "hx-install": "node ./scripts/hx-install.mjs",
     "perf": "tsx perf/bench.ts",
-    "perf:gen": "tsx perf/gen-suite.ts"
+    "perf:gen": "tsx perf/gen-suite.ts",
+    "release-editor": "node ./scripts/publish-editor.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -145,5 +146,9 @@
     "@vscode/vsce": "^3.9.2",
     "tsx": "^4.23.12",
     "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "name": "@andares/promptdown",
+    "access": "public"
   }
 }

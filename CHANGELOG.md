@@ -4,6 +4,14 @@
 
 # Changelog
 
+## 0.9.0 (未发布)
+
+- 新增 **`@andares/pdeditor`**（packages/editor/，独立 workspace 包）：headless 提示词输入框组件
+  - 基于 Yace（~2KB 零依赖），pd/md/xml/json/yaml 五格式语法高亮（pd 自研 tokenizer 与主包 lexer 语义一致；其余用 Prism）
+  - headless：零样式零 chrome，语言切换为 API（setLanguage），外观完全外部定义；内置 Tab 缩进/续行（Yace 插件）
+  - 构建：vite lib mode（ESM/CJS + d.ts）；测试：vitest + jsdom（18 用例）；demo 页见 packages/editor/demo/
+- 主包发布流程重构：用 npm `publishConfig.name` 声明 scoped 名（@andares/promptdown），删掉 publish.mjs 临时改包名逻辑；`.npmignore` 排除 packages/
+
 ## 0.8.0 (未发布)
 
 - 新增 **`pdcompile`** 命令（CLI + VSCode）：多段编译为单份完整 pd——跨文件合并段列表、引用内联展开、统一 format 输出

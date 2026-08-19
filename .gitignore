@@ -21,3 +21,6 @@ icons/concepts/
 
 # 性能测试生成物（perf/bench.ts 运行时生成）
 perf/generated/
+
+# demo 预构建产物（packages/editor/demo-dist/）
+demo-dist/

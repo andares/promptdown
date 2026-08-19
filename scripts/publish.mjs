@@ -22,8 +22,9 @@
  *
  * 注意：
  *  - pnpm 包与 VSCode 扩展共用 package.json 的 version（单包设计）。
- *  - npm registry 上 `promptdown` 已被他人占用，发布 npm 时临时切换 scoped
- *    名 `@andares/promptdown`（--access=public），随后恢复供 vsce 使用。
+ *  - npm registry 上 `promptdown` 已被他人占用，发布 npm 用 publishConfig.name 声明
+ *    scoped 名 `@andares/promptdown`（--access=public）；package.json 的 name 保持
+ *    `promptdown` 供 vsce 使用（扩展 ID = andares.promptdown）。
  *  - 发布的 tarball 只含 dist/docs/skill 等（.npmignore 控制——pnpm
  *    复用 npm 的发布文件机制），本脚本与 PLAN.md 不发布。
  */
@@ -38,7 +39,6 @@ const PKG_PATH = join(ROOT, "package.json");
 const BUMPS = ["major", "minor", "patch"];
 
 const NPM_NAME = "@andares/promptdown";
-const VSCE_NAME = "promptdown";
 const curl = process.platform === "win32" ? "curl.exe" : "curl";
 
 const C = {
@@ -206,7 +206,7 @@ if (dryRun) {
 		);
 	}
 	console.log(
-		`  4. pnpm publish --no-git-checks --access=public（scoped: ${NPM_NAME}）`,
+		`  4. pnpm publish --no-git-checks --access=public（publishConfig.name: ${NPM_NAME}）`,
 	);
 	console.log(
 		`  5. git push origin ${branch} refs/tags/v${next}（best-effort）`,
@@ -322,19 +322,12 @@ run(git, ["commit", "-m", `chore: release v${next}`]);
 run(process.execPath, [join(ROOT, "scripts", "tag-current.mjs")]);
 
 // 4. Publish pnpm (prepublishOnly re-gates with typecheck + test + build).
-// 临时切换 scoped 包名发布（npm 的 promptdown 已被占用），随后恢复供 vsce 打包。
-step(`pnpm publish（scoped: ${NPM_NAME}）`);
-pkg.name = NPM_NAME;
-writeFileSync(PKG_PATH, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
-let publish;
-try {
-	publish = run(pnpm, ["publish", "--no-git-checks", "--access=public"], {
-		allowFailure: true,
-	});
-} finally {
-	pkg.name = VSCE_NAME;
-	writeFileSync(PKG_PATH, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
-}
+// 包名走 package.json 的 publishConfig.name（@andares/promptdown），不再临时改 package.json。
+// package.json 的 name 保持 promptdown（vsce 需要非 scoped 名，扩展 ID = andares.promptdown）。
+step(`pnpm publish（publishConfig.name: ${NPM_NAME}）`);
+const publish = run(pnpm, ["publish", "--no-git-checks", "--access=public"], {
+	allowFailure: true,
+});
 if (publish.status !== 0) {
 	console.error(
 		`${C.red}npm publish failed — 流程中止（版本已锚定在 ${next}）。` +
