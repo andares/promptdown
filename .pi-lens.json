@@ -2,5 +2,16 @@
   "rules": {
     "high-complexity": { "threshold": 30 },
     "high-fan-out": { "threshold": 25 }
+  },
+  "format": {
+    "enabled": false
+  },
+  "autofix": {
+    "enabled": false
+  },
+  "actionableWarnings": {
+    "autoFix": {
+      "enabled": false
+    }
   }
 }
