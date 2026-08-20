@@ -12,7 +12,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { splitInlineCode } from "../src/parser/lexer";
+import { splitInlineCode } from "@andares/pdfoundation";
 
 const REF_RE = /(?:^|\s):([^\s-][^\s]*)(?=\s|$)/g;
 

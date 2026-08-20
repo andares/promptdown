@@ -5,15 +5,14 @@
   "version": "0.8.1",
   "publisher": "andares",
   "license": "MIT",
+  "dependencies": {
+    "@andares/pdfoundation": "workspace:^"
+  },
   "icon": "icons/pd-icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
     "onLanguage:promptdown",
-    "onDidOpenTextDocument",
-    "onDidChangeTextDocument",
-    "onCommand:pdtransform",
-    "onCommand:pdcompile",
-    "onCommand:promptdown.tab"
+    "onStartupFinished"
   ],
   "repository": {
     "type": "git",
@@ -125,7 +124,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm --filter @andares/pdfoundation build && rm -rf dist && tsc -p tsconfig.json && node scripts/bundle-extension.mjs",
     "watch": "tsc -w -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
@@ -138,14 +137,16 @@
     "hx-install": "node ./scripts/hx-install.mjs",
     "perf": "tsx perf/bench.ts",
     "perf:gen": "tsx perf/gen-suite.ts",
-    "release-editor": "node ./scripts/publish-editor.mjs"
+    "release-editor": "node ./scripts/publish-editor.mjs",
+    "release-foundation": "node ./scripts/publish-foundation.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.12",
     "@types/node": "^24.13.3",
     "@types/vscode": "^1.90.0",
-    "@vscode/vsce": "^3.9.2",
-    "tsx": "^4.23.12",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@vscode/vsce": "^3.9.2"
   },
   "publishConfig": {
     "name": "@andares/promptdown",

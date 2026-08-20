@@ -15,14 +15,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { format } from "../src/format";
-import { jsonToPdText } from "../src/jsonToPd";
-import { nameSections, splitSections } from "../src/parser/expand";
 import {
 	compilePdText,
 	compileSections,
+	format,
+	jsonToPdText,
+	nameSections,
 	pdToJsonText,
-} from "../src/pdtransform";
+	splitSections,
+} from "@andares/pdfoundation";
 import { buildSuite } from "./gen-suite";
 
 /** 跑多次取中位数（ms） */

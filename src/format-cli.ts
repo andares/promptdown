@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
-import { format } from "./format";
+import { format } from "@andares/pdfoundation";
 
 const USAGE = `用法: pdformat <file.pd> [-w|--write]
 

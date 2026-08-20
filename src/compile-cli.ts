@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
-import { nameSections, splitSections, type Section } from "./parser/expand";
-import { compileSections } from "./pdtransform";
+import { nameSections, splitSections, type Section, compileSections } from "@andares/pdfoundation";
 
 const USAGE = `用法: pdcompile <section> <file>[...<file>]
 

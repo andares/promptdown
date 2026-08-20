@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
-import { format } from "./format";
-import { jsonToPdText } from "./jsonToPd";
-import { detectTransformKind, pdToJsonText } from "./pdtransform";
+import { format, jsonToPdText, detectTransformKind, pdToJsonText } from "@andares/pdfoundation";
 
 const YELLOW = "\x1b[33m";
 const RESET = "\x1b[0m";
