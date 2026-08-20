@@ -1,103 +1,84 @@
-# @andares/pdeditor：headless 提示词输入框组件（基于 Yace）
+# Plan: demo 实装格式化 + JSON↔PD 转换按钮
 
 ## Context
 
-promptdown 已有完整工具链（CLI/VSCode/语法规范），缺最后一块拼图：**Web 输入框组件**——在各平台框架（React/Vue/Svelte/原生）中嵌入一个支持多格式（pd/md/xml/json/yaml）的提示词输入框。
+headless 包 `@andares/pdeditor`（v0.2.0）本身不含格式化/转换语义（AGENTS.md 已注明，属成品层方向）。
+但 demo 页是开发/演示环境（`demo-dist` 为本地产物，gitignored 不入库、不进 npm 包），
+可以直接 import 主包源码调 `format` / `pdToJsonText` / `jsonToPdText`，走 `setValue` 回写——
+这正好实装 AGENTS.md 里写的"外部框架可自行调主包 format 后 setValue 回写"的接入方式。
 
-**方向已定（用户决策）**：
+## 探索发现
 
-- **headless 优先**：纯背后控制，只渲染输入框内容；外观/样式由外部框架定义。**语言切换也是 API 行为**（`setLanguage()`），不做 UI 切换器。成品输入框（放大模式/历史/格式切换器）是未来可选方向，界面设计更复杂，往后放
-- **不是富文本**：pd 是纯代码文本，要的是**精确**而非样式——高亮服务于精确；编辑模型必须保留原始文本
-- **选型定 Yace**（<https://github.com/petersolopov/yace）：~2KB> gzipped、零依赖、插件化、BYO highlighter、框架无关
-- 排除富文本引擎（ProseMirror/Lexical/Slate——文档模型破坏 pd 精确文本）；排除 CM6/Monaco 作为输入框本体（过重）
-- **组件包名：`@andares/pdeditor`**（独立 workspace 包，独立版本）
-- **同步做一个极简测试页**：headless 组件没有 UI，必须有 demo 页面引用库验证预览效果，否则没法看
+- 主包核心函数均为纯逻辑、无 vscode 依赖，浏览器内可跑：
+  - `format(text: string): string` — src/format.ts L211
+  - `pdToJsonText(text, selector?, fileStem?): string` — src/pdtransform.ts（解析错误 throw 带行号；多段未指定段 throw）
+  - `jsonToPdText(jsonText): { pd, warnings }` — src/jsonToPd.ts
+- 主包**无 exports 字段**、main 指向 `dist/extension.js`（import 会拉 vscode）→
+  demo 不能 import 已发布包，正确姿势是**相对路径直引源码**：`import { format } from "../../../src/format"`
+  （demo 在 packages/editor/demo/，到仓库根 src 需三级向上）。
+  跨 workspace 源码引用 vite 直接编译 bundle，无碍。
+- editor 的 tsconfig include 仅 `src`，bundle-guard 只查 dist 产物 → demo 引主包不影响 typecheck / test / lib 构建 / 发布。
+- demo 现状：`demo/index.html` 已有 #fmt 按钮（无操作）；`demo/main.ts` 有 `createPdEditor` 实例 + 语言切换 select + status 区。
+
+### 宽容度答案（json→pd）
+
+**宽容模式，不报错**。仅两种输入抛错：非有效 JSON（"不是有效的 JSON 文本"）、JSON 根不是对象。
+其余不匹配内容逐条收集到 `warnings`（不中断、不整体失败）：
+
+| 不匹配情形 | 处理 |
+| --- | --- |
+| number / boolean / null | 转文本 `key: 123` + 警告（不丢弃） |
+| 键名不符合规则（含冒号/空白结尾等） | 丢弃 + 警告 |
+| 数组（非 InfoN/CodeN） | 丢弃 + 警告 |
+| 顶层 InfoN 键 | 丢弃 + 警告 |
+| 空字符串 / 多行字符串 / 首尾空白字符串 | 丢弃 + 警告 |
+| Info 编号不连续或相邻段 | 丢弃 + 警告 |
+| InfoN 内对象/数组元素 | 丢弃 + 警告 |
+| 内容形似围栏/段标记/分隔线 | 丢弃 + 警告 |
+| 空对象 | 渲染为裸 `key:`（保留） |
+
+pd→json 相反：**严格**，解析错误直接 throw（带行号），多段未指定段也 throw。
 
 ## Approach
 
-### 组件包：packages/editor/（发布 @andares/pdeditor）
+demo 直引主包源码，实装两个按钮：
 
-- **高亮核心**：基于 Yace（BYO highlighter 接口）
-  - pd 高亮函数：复用 `src/parser/lexer.ts` 的 token 逻辑 → 转成 yace 的 `highlight(source) → HTML`
-  - md/xml/json/yaml 高亮：Prism.js（markup/markdown/json/yaml 语法现成）
-  - 语言切换 = API（`setLanguage(lang)`），headless 无 UI
-- **语义复用**：直接 import `@andares/promptdown` 核心（纯 TS 零 Node 依赖，已验证可移植）——`format()` / `pdToJsonText` / `jsonToPdText` / `splitSections` / `detectTransformKind`
-- **headless API**（无 UI 假设）：
-
-  ```ts
-  createPdEditor(el: HTMLElement, opts: {
-    value: string;
-    language: "pd" | "md" | "xml" | "json" | "yaml";
-    onValueChange?: (v: string) => void;
-    highlight?: (source: string, lang: string) => string; // BYO 覆盖
-  }): {
-    setValue(v: string): void;
-    getValue(): string;
-    setLanguage(lang: Lang): void;   // 语言切换 = API
-    destroy(): void;
-  }
-  ```
-
-- **插件**（yace 插件化）：Tab 缩进（移植 `src/tab.ts` 的 listItemWsRun 逻辑）、`-` 续行、历史（可选，未来）
-
-### 构建/发布（组件包）
-
-- **vite lib mode**：产出 ESM/CJS/UMD + d.ts（浏览器生态标准）
-- workspace：`pnpm-workspace.yaml` 加 `packages/*`；`@andares/promptdown` 作为 dependency
-- 独立版本管理，独立 release 流程
-
-### 主包发布流程重构（用户要求的清理）
-
-- **问题**：`scripts/publish.mjs` 发布时临时 `pkg.name = "@andares/promptdown"` → publish → 恢复 `promptdown`（vsce 需要非 scoped 名，扩展 ID = `publisher.name`）
-- **方案**：用 npm 官方 `publishConfig.name` 机制——package.json 保持 `name: "promptdown"`（vsce 硬约束：scoped 名会生成非法扩展 ID），加 `"publishConfig": { "name": "@andares/promptdown", "access": "public" }`——npm/pnpm publish 自动用 publishConfig.name，**删掉 publish.mjs 的临时改名逻辑**（两处 `pkg.name = ...`）
-- **验证**：`pnpm publish --dry-run` 显示发布名为 @andares/promptdown；vsce package 仍产出 `promptdown-<ver>.vsix`
+1. **格式化（pd）**：`editor.setValue(format(editor.getValue()))`；非 pd 语言点击提示"仅 pd 支持格式化"。
+2. **转换 JSON ↔ PD**（按钮文案待定）：按当前语言决定方向
+   - pd → json：`pdToJsonText(value)` → try/catch，成功 `setLanguage("json")` + `setValue(json)`；
+     多段（splitSections 数量 > 1）→ 报错显示段名列表，说明 demo 仅支持单段转换（与 VSCode 选段语义一致，demo 无选段 UI）
+   - json → pd：`jsonToPdText(value)` → 成功 `setLanguage("pd")` + `setValue(format(result.pd))`；warnings 合并显示到 status
+   - md / xml / yaml：提示"仅 pd / json 支持转换"
+   - 来回转换语义与原样（json 侧是 2 空格缩进的 prettier json，可再转回）
 
 ## Files to modify
 
-- `packages/editor/`（新）：组件源码 + vite 构建 + 包配置
-  - `packages/editor/src/index.ts`：headless API（createPdEditor）
-  - `packages/editor/src/pd-highlight.ts`：pd tokenizer → HTML（复用 lexer 语义）
-  - `packages/editor/src/highlighters.ts`：Prism 集成（md/xml/json/yaml）
-  - `packages/editor/src/plugins/`：tab 缩进、`-` 续行
-  - `packages/editor/demo/`：极简测试页（index.html + main.ts，验证高亮/切换/IME）
-  - `packages/editor/vite.config.ts`、`package.json`、`tsconfig.json`
-- `pnpm-workspace.yaml`：加 `packages/*`
-- `package.json`：加 `publishConfig`（主包）；`scripts/publish.mjs`：删临时改名逻辑
-- `AGENTS.md`：加"组件开发计划"章节（当前目标 + 未来方向）
-- 测试：`packages/editor/test/*.test.ts`（vitest + jsdom）
+- `packages/editor/demo/index.html` — 新增转换按钮（#transform）
+- `packages/editor/demo/main.ts` — import 主包源码 + 两个按钮实装 + 错误/警告展示
 
 ## Reuse
 
-- `src/parser/lexer.ts`：lexLine/splitInlineCode/matchKeyValue——pd 高亮 tokenizer 的语义来源
-- `src/parser/expand.ts`：splitSections——段大纲（未来）
-- `src/pdtransform.ts`：detectTransformKind/pdToJsonText——语言检测与转换
-- `src/format.ts`：format()——格式化命令（未来）
-- `src/tab.ts`：listItemWsRun——Tab 缩进插件
-- `syntaxes/pd.tmLanguage.json`：高亮 scope/正则参考（TextMate 正则已验证）
+- `src/format.ts` → `format`
+- `src/pdtransform.ts` → `pdToJsonText`
+- `src/jsonToPd.ts` → `jsonToPdText`（含 warnings）
 
 ## Steps
 
-- [ ] 探索 Yace API（BYO highlighter、插件接口）并做 spike：pd 高亮函数接到 Yace 上，验证 IME/滚动/对齐（demo 页）
-- [ ] 搭建 workspace：packages/editor/ + vite lib 配置 + vitest 环境
-- [ ] 实现 headless API（createPdEditor + setLanguage/setValue/getValue/destroy）
-- [ ] 实现 pd 高亮 tokenizer（复用 lexer 语义）
-- [ ] 接入 Prism：md/xml/json/yaml 高亮
-- [ ] 插件：Tab 缩进（移植 tab.ts）、`-` 续行
-- [ ] demo 测试页（极简预览 + 语言切换 + 中文 IME 验证）
-- [ ] 测试（vitest + jsdom）：高亮输出/语言切换/值回调
-- [ ] 主包发布流程重构：publishConfig.name + 删 publish.mjs 临时改名（验证 dry-run）
-- [ ] 文档 + AGENTS.md 计划章节 + 发布准备
+- [ ] demo/index.html 添加转换按钮（保留现有 #fmt，改注释/文案）
+- [ ] demo/main.ts import 三函数（相对路径 `../../src/...`）
+- [ ] fmt 按钮实装：pd 才执行，非 pd 提示
+- [ ] transform 按钮实装：方向判定按当前语言；pd→json 多段处理见待定项；json→pd 合并 warnings 到 status
+- [ ] 转换后 setLanguage 同步高亮（pd↔json）
 
-## Verification
+## Verification（已执行，全部通过）
 
-- demo 页：pd 输入 → 高亮正确（键值/序列/段标记/引用/行内代码/围栏）；md/xml/json/yaml 切换正常；中文 IME 无脱同步
-- 组件测试：高亮函数输出、setLanguage/setValue 行为、onValueChange
-- 主包：`pnpm publish --dry-run` 发布名为 @andares/promptdown；vsce package 正常
-- 门禁：主包 typecheck + test；组件包 typecheck + vitest + vite build
+- `pnpm --filter @andares/pdeditor typecheck && test` ✓（52 tests，含新增 demo-smoke）
+- `pnpm --filter @andares/pdeditor build:demo` ✓ 重建 demo-dist（244 modules，61KB js）
+- 逻辑等价验证：临时 tsx 脚本直跑主包函数——多段检测/报错含段名、宽容度 6 条警告不中断、单段回环无警告、格式化全角→半角 ✓
+- 永久测试 `test/demo-smoke.test.ts`：jsdom 下 DOM 事件驱动 demo 按钮——多段报错、pd↔json 来回回环一致、语言切换同步、fmt 非 pd 提示、md/xml/yaml 不支持转换 ✓
+- demo 产物已重建（demo-dist/index.html 含 transform 按钮）。**不 commit**（plannotator 约束：留工作区脏）
 
-## 未来可选方向（写入 AGENTS.md，不在本期实现）
+## 决策（已确认）
 
-- 成品输入框（headless 核心 + UI 层）：格式切换器（复用 detectTransformKind）、Ctrl+G 放大模式（大输入切 CM6 专用编辑器）、历史记录（localStorage/IndexedDB）、工具栏（格式化/转 JSON/段大纲）
-- 主题系统（CSS 变量，参考 synesthesia）
-- 移动端/触屏适配
-- 协同（Yjs）
+- 多段 pd 点"转换 JSON" → **报错提示选段**：status 显示 `文件包含 2 个 pd 段（基础设定, 主任务），demo 转换仅支持单段，请先展开`（与 VSCode 一致，demo 无选段 UI）
+- **不 commit**（plannotator 约束：留工作区脏，等用户 review 后自行处理）

@@ -114,13 +114,15 @@ src/
 - **语言切换是 API 行为**（非 UI 切换器）：pd / md / xml / json / yaml（Prism 提供后四种）
 - **不是富文本**：pd 是纯代码文本，要精确不要样式——高亮服务于精确；排除富文本引擎（ProseMirror/Lexical/Slate）与 CM6/Monaco 本体
 - **不依赖主包**（避免包名耦合——主包文件内 name 为 promptdown、npm 发布名为 @andares/promptdown）：pd 高亮 tokenizer 在组件内自研（语义与 `src/parser/lexer.ts` 一致，见 `packages/editor/src/inline.ts`）；依赖主包语义工具（format/转换/段解析）属成品层未来方向
+- **格式化 / 转 JSON 未提供**（指 headless 包自身，demo 除外）：headless 当前只做渲染 + 编辑插件（回车续行、Tab/Shift+Tab 缩进），不含 format / 转换语义；外部框架可自行调主包 format 后 `setValue` 回写——demo 已实装该接入方式作参考（`packages/editor/demo/` 直引 `../../../src` 主包源码，vite bundle；有 `test/demo-smoke.test.ts` 防回归）
 - **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 测试 28 用例）
 - **demo 页**：`packages/editor/demo/`（vite dev 验证高亮/语言切换/中文 IME）
 - 插件（yace 内置）：Tab 缩进 + 续行缩进默认启用
 
 ### 未来可选方向（不在本期实现）
 
-- **成品输入框**（headless 核心 + UI 层）：格式切换器（复用 detectTransformKind）、Ctrl+G 放大模式（大输入切 CM6 专用编辑器）、历史记录（localStorage/IndexedDB）、工具栏（格式化/转 JSON/段大纲）
+- **格式化 / 转 JSON**（语义功能，计划要做，优先级高于成品输入框）：headless 自身**未提供**；实现时需先解决依赖主包 format / pdtransform 语义的耦合问题（考虑抽共享语义包）——demo 直引主包源码已验证该链路可行（见 demo/ + demo-smoke 测试）
+- **成品输入框**（headless 核心 + UI 层，**不着急做**）：格式切换器（复用 detectTransformKind）、Ctrl+G 放大模式（大输入切 CM6 专用编辑器）、历史记录（localStorage/IndexedDB）、工具栏（段大纲等）
 - 主题系统（CSS 变量，参考 synesthesia）
 - 移动端/触屏适配、协同（Yjs）
 
