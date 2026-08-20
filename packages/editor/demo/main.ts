@@ -1,11 +1,14 @@
 import { createPdEditor, type EditorLang } from "../src/index";
-// 语义操作（格式化 / 双向转换）：demo 直引主包源码（无 vscode 依赖的纯逻辑），
-// 经 setValue 回写——这正是 AGENTS.md 写的"外部框架可自行调主包 format 后 setValue 回写"接入方式。
-// 相对路径跨 workspace 引用仅存在于 demo（demo-dist 为本地产物，不进 npm 包）。
-import { format } from "../../../src/format";
-import { pdToJsonText, sectionNames } from "../../../src/pdtransform";
-import { jsonToPdText, type JsonToPdResult } from "../../../src/jsonToPd";
-import { splitSections } from "../../../src/parser/expand";
+// 语义操作（格式化 / 双向转换）：从共享语义包 @andares/pdfoundation 引用
+// （与 pd 入口 re-export 同源），经 setValue 回写——external + peer 的真实消费姿势。
+import {
+	format,
+	jsonToPdText,
+	pdToJsonText,
+	sectionNames,
+	splitSections,
+	type JsonToPdResult,
+} from "@andares/pdfoundation";
 
 const SAMPLE: Record<EditorLang, string> = {
 	pd: `//!pd 基础设定

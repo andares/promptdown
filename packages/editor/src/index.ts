@@ -6,6 +6,11 @@ import { escapeHtml, type PdEditorInstance, type PdEditorOptions } from "./core"
 
 export type { EditorLang, PdEditorInstance, PdEditorOptions } from "./core";
 
+// 语义 API（re-export @andares/pdfoundation，external + peer）——与 /pd 入口一致。
+// vite lib 构建将共享语义包 external 掉（见 vite.config.ts rollupOptions.external），
+// 运行时由消费方按 peerDependencies 提供，产物零体积、语义单一来源。
+export { format, jsonToPdText, pdToJsonText } from "@andares/pdfoundation";
+
 /**
  * 内置高亮管线（Yace 管线第一级：html:false → 纯文本转 HTML）。
  * pd 用自研 tokenizer；md/xml/json/yaml 用 Prism（本入口因此包含 Prism）。

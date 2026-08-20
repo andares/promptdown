@@ -14,5 +14,10 @@ export default defineConfig({
 		},
 		sourcemap: true,
 		emptyOutDir: false,
+		// 语义 re-export：@andares/pdfoundation 保持 external（不内联），
+		// 由消费方按 peerDependencies 提供——避免产物携带语义副本导致漂移。
+		rollupOptions: {
+			external: ["@andares/pdfoundation"],
+		},
 	},
 });

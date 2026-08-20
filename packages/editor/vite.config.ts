@@ -14,6 +14,10 @@ export default defineConfig({
 		},
 		sourcemap: true,
 		emptyOutDir: true,
+		// 语义 re-export：@andares/pdfoundation 保持 external（不内联），由消费方按 peer 提供
+		rollupOptions: {
+			external: ["@andares/pdfoundation"],
+		},
 	},
 	test: {
 		environment: "jsdom",
