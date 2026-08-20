@@ -1,6 +1,6 @@
 {
   "name": "@andares/pdeditor",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Headless prompt 输入框组件（基于 Yace）：pd/md/xml/json/yaml 语法高亮，语言切换为 API 行为，无 UI 假设",
   "type": "module",
   "license": "MIT",
