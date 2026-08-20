@@ -266,9 +266,21 @@ function expandRefLine(
 	refs.forEach((r, i) => {
 		const before = body.slice(pos, r.start).trim();
 		if (before) out.push(`${" ".repeat(base)}- ${before}`);
+		let inFence = false;
 		for (const rl of (expanded[i] as { lines: string[] }).lines) {
 			const rlTrim = rl.trim();
 			if (rlTrim === "") continue;
+			// ``` 围栏行与围栏内容：永远顶层原样嵌入（code 块无视前置上下文，
+			// parse 后归顶层键）。转 `- ` 项会破坏围栏语义（body 被序列前缀污染）。
+			if (rlTrim.startsWith("```")) {
+				inFence = !inFence;
+				out.push(rl);
+				continue;
+			}
+			if (inFence) {
+				out.push(rl);
+				continue;
+			}
 			const rlIndent = rl.length - rl.trimStart().length;
 			if (rlIndent === 0 && !rlTrim.startsWith("-")) {
 				out.push(`${" ".repeat(base)}- ${rlTrim}`);

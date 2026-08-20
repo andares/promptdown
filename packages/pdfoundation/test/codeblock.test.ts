@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { format } from "../src/format";
+import { format } from "../src";
 import { expand } from "../src/parser/expand";
 import { lex } from "../src/parser/lexer";
 import { parse } from "../src/parser/parser";

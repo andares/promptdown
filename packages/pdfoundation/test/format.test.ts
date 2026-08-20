@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { format } from "../src/format";
+import { format } from "../src";
 
 test("全角冒号 → 半角（键值位置）", () => {
 	assert.equal(format("name1：some"), "name1: some");

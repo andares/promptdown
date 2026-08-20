@@ -6,9 +6,9 @@ import { expand, splitSections } from "../src/parser/expand";
 import { lex, lexLine } from "../src/parser/lexer";
 import { parse } from "../src/parser/parser";
 import { toJson } from "../src/parser/toJson";
-import { compilePdText } from "../src/pdtransform";
+import { compilePdText } from "../src";
 
-const FIX = join(__dirname, "fixtures");
+const FIX = join(import.meta.dirname, "fixtures");
 
 function fromText(text: string, section?: string): unknown {
 	const expanded = expand(text, section);

@@ -7,8 +7,8 @@ import {
 	isPdFileName,
 	pdToJsonText,
 	sectionNames,
-} from "../src/pdtransform";
-import { detectTransformKind, isJsonFileName } from "../src/pdtransform";
+} from "../src";
+import { detectTransformKind, isJsonFileName } from "../src";
 import {
 	findSection,
 	nameSections,
@@ -16,7 +16,7 @@ import {
 	splitSections,
 } from "../src/parser/expand";
 
-const FIX = join(__dirname, "fixtures");
+const FIX = join(import.meta.dirname, "fixtures");
 
 // ---- pdToJsonText：pd 文本 → 格式化 JSON 字符串 ----
 

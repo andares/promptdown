@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { jsonToPdText } from "../src/jsonToPd";
-import { format } from "../src/format";
+import { jsonToPdText } from "../src";
+import { format } from "../src";
 import { expand, splitSections } from "../src/parser/expand";
 import { lex } from "../src/parser/lexer";
 import { parse } from "../src/parser/parser";
 import { toJson } from "../src/parser/toJson";
 
-const FIX = join(__dirname, "fixtures");
+const FIX = join(import.meta.dirname, "fixtures");
 
 /** 解析 pd 文本（按段；空段名 → 不指定，单段直接取）→ JSON 对象 */
 function toJsonObj(pd: string, section?: string): unknown {

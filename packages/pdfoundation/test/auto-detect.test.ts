@@ -4,7 +4,7 @@ import {
 	detectPdIntent,
 	isPdMarkerLine,
 	mayBeCommentLine,
-} from "../src/auto-detect";
+} from "../src";
 
 // ---- 打开时检测 detectPdIntent（前 maxLines 行内出现段标记行） ----
 
