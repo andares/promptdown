@@ -1,6 +1,6 @@
 {
   "name": "@andares/pdeditor",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Headless prompt 输入框组件（基于 Yace）：pd/md/xml/json/yaml 语法高亮，语言切换为 API 行为，无 UI 假设",
   "type": "module",
   "license": "MIT",
@@ -32,6 +32,9 @@
     "build:demo": "vite build --config vite.demo.config.ts",
     "build:editor": "pnpm build && pnpm build:demo"
   },
+  "dependencies": {
+    "@andares/pdfoundation": "workspace:^"
+  },
   "devDependencies": {
     "@andares/pdfoundation": "workspace:^",
     "@types/prismjs": "^1.26.6",
@@ -41,8 +44,5 @@
     "vite": "^6.0.0",
     "vitest": "^3.0.0",
     "yace": "^1.0.0"
-  },
-  "peerDependencies": {
-    "@andares/pdfoundation": "workspace:^"
   }
 }

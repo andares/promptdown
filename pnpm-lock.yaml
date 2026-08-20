@@ -32,10 +32,11 @@ importers:
         version: 5.9.3
 
   packages/editor:
-    devDependencies:
+    dependencies:
       '@andares/pdfoundation':
         specifier: workspace:^
         version: link:../pdfoundation
+    devDependencies:
       '@types/prismjs':
         specifier: ^1.26.6
         version: 1.26.6
