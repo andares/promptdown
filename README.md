@@ -399,14 +399,14 @@ pnpm package     # 以 --no-dependencies 打包 .vsix
 ### 发布
 
 ```bash
-pnpm release patch        # 只发 npm + push 分支/打 tag（0.1.0 → 0.1.1）
-pnpm release-all patch    # npm + VSCode 一起发：npm 失败中止，vsce 失败只提示
+pnpm release-all patch     # 唯一主包发布入口：foundation（同号）→ npm → push/tag → vsce
+pnpm release-editor patch  # editor 独立发布（纯 npm）
+pnpm release patch -- --dry-run  # 预览计划（误敲 release 会被拦截提示改用 release-all）
 pnpm tag-current          # 给当前版本打本地 tag vX.Y.Z（已存在则跳过，不推送）
-pnpm release patch -- --dry-run   # 先预览计划
 ```
 
-- `pnpm release`：sync（未提交改动自动 commit、本地领先自动 push、本地落后中止提示 pull，没有则跳过）→ 门禁检查 → 版本 bump → `git commit + tag vX.Y.Z` → `pnpm publish` → `git push origin <分支> refs/tags/vX.Y.Z` → 创建 GitHub Release。**不做 vsce**
-- `pnpm release-all`：与 release **前面完全一样（一个步骤不少）**，末尾追加 vsce package + publish；npm 失败中止，vsce 失败降级为只发 npm
+- `pnpm release-all`（唯一主包入口）：sync（未提交改动自动 commit、本地领先自动 push、本地落后中止、没有则跳过）→ 门禁（含 foundation）→ 主包 + foundation **同号 bump** → `git commit + tag vX.Y.Z` → **先发 foundation 再发主包**（`workspace:^` 发布时自动改写为实际版本）→ push 分支 + tags → 创建 GitHub Release → vsce package + publish。npm 失败中止，vsce 失败降级为只发 npm。
+- `pnpm release` / `pnpm release-foundation` 已移除（并入 release-all）：误敲会被拦截提示。
 
 ## 📁 项目结构
 

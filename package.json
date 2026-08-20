@@ -129,16 +129,14 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "package": "vsce package --no-dependencies",
-    "release": "node ./scripts/publish.mjs",
-    "release-all": "node ./scripts/publish.mjs all",
+    "release-all": "node ./scripts/publish.mjs",
     "tag-current": "node ./scripts/tag-current.mjs",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "wsl-install": "node ./scripts/wsl-install.mjs",
     "hx-install": "node ./scripts/hx-install.mjs",
     "perf": "tsx perf/bench.ts",
     "perf:gen": "tsx perf/gen-suite.ts",
-    "release-editor": "node ./scripts/publish-editor.mjs",
-    "release-foundation": "node ./scripts/publish-foundation.mjs"
+    "release-editor": "node ./scripts/publish-editor.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

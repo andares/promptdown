@@ -1,33 +1,33 @@
 {
-	"name": "@andares/pdfoundation",
-	"version": "0.1.0",
-	"description": "promptdown 的共享语义核心：解析 / 格式化 / 双向转换（零运行时依赖，Node 与 Web 通用）",
-	"type": "module",
-	"license": "MIT",
-	"files": [
-		"dist"
-	],
-	"main": "./dist/index.cjs",
-	"module": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"sideEffects": false,
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js",
-			"require": "./dist/index.cjs",
-			"default": "./dist/index.js"
-		},
-		"./package.json": "./package.json"
-	},
-	"scripts": {
-		"build": "vite build && tsc --emitDeclarationOnly",
-		"typecheck": "tsc --noEmit",
-		"test": "tsx --test test/*.test.ts"
-	},
-	"devDependencies": {
-		"tsx": "^4.23.12",
-		"typescript": "^5.9.3",
-		"vite": "^6.0.0"
-	}
+  "name": "@andares/pdfoundation",
+  "version": "0.2.0",
+  "description": "promptdown 的共享语义核心：解析 / 格式化 / 双向转换（零运行时依赖，Node 与 Web 通用）",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "vite build && tsc --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0"
+  }
 }

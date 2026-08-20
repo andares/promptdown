@@ -30,13 +30,10 @@
 
 ## 2. npm 层（发布链路 + 消费姿态）
 
-> ⚠️ 主包新增 `dependencies: @andares/pdfoundation`（runtime 依赖）；共享包独立版本、独立发布、**不在 release-all 范围**。
+> ⚠️ 主包新增 `dependencies: @andares/pdfoundation`（runtime 依赖）；foundation **版本与主包同号绑定**，随 release-all 一起发。
 
 - [ ] `npm pack --dry-run`（主包）→ 清单：**不含 packages/**、不含 node_modules、含 dist + skill ✅
-- [ ] **发布顺序**（顺序错了会发布失败/装不到依赖）：
-  1. `pnpm release-foundation patch`（纯 npm，无 git 操作；`--dry-run` 先预览）
-  2. 主包 `pnpm release <patch>` →（release-all 则再打 VSIX）
-  3. `pnpm release-editor patch`
+- [ ] **唯一主包发布入口**：`pnpm release-all patch` → 顺序固定 foundation（同号）→ 主包 → push/tag → vsce；editor 单独 `pnpm release-editor`；误敲 `pnpm release` 应被拦截提示
 - [ ] 临时目录 `npm i @andares/pdfoundation` → `import { format, pdToJsonText, jsonToPdText, compilePdText, splitInlineCode }` 全部可用且行为正确
 - [ ] 临时 vite 项目 `npm i @andares/pdeditor @andares/pdfoundation` → 引 `/pd` 入口，`vite build` 验证：产物**无 Prism**、语义可 tree-shake、能跑
 - [ ] **主包回滚预案**：发布失败 → `git tag -d vX.Y.Z && git reset --hard HEAD~1`

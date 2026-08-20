@@ -1,32 +1,29 @@
 #!/usr/bin/env node
 /**
- * One-command release for promptdown（pnpm 包 + VSCode 扩展）。
+ * One-command release for promptdown（pnpm 主包 + @andares/pdfoundation + VSCode 扩展）。
  *
- *   pnpm release patch            # npm 发布 + 打 tag 并推送：0.1.0 → 0.1.1
- *   pnpm release-all patch        # npm + VSCode 一起发：npm 失败中止，vsce 失败降级为只发 npm
+ *   pnpm release-all patch        # 一键：foundation（版本与主包同号）→ 主包 npm → 打 tag 推送 → vsce
  *
- * 模式：
- * - release：sync（未提交改动 → git add -A + commit；本地领先 → push 分支，
- *   失败中止；本地落后 → 中止提示 pull；没有 → 跳过）→
- *   门禁 → bump(major|minor|patch) → commit+tag → pnpm publish（失败中止）
- *   → git push origin <当前分支> refs/tags/v{next}（best-effort，失败仅警告）→
- *   创建 GitHub Release v{next}（best-effort：未设 GITHUB_TOKEN / tag 未到远端 /
- *   已存在 / 失败都只提示、不中止）。
- *   不做 vsce package/publish。
- * - release-all：同 release（前面所有步骤一个不少），npm 成功后额外跑
- *   vsce package + publish——vsce 凭据（VSCE_PAT 环境变量或 `vsce login` 存的
- *   ~/.vsce 文件）缺失或发布失败时降级：只提示、不中止，结果 = 仅 npm 已发布
- *   （可稍后手动补发扩展）。
+ * 模式（2026-08 起收敛）：
+ * - 发布入口只剩两个：`pnpm release-all`（本脚本）与 `pnpm release-editor`（editor 包独立）。
+ * - `pnpm release`（独立 npm 发布）已移除：主包与 foundation 强绑定，必须走 release-all，
+ *   防止漏发 foundation 或版本脱节。误敲 `pnpm release` 会得到明确报错提示。
+ * - `release-foundation` 已并入本脚本：foundation 版本号**与主包完全同号**（本次在
+ *   publish-all 里把 foundation package.json 的 version 写为与主包一致的 next），
+ *   顺序 fix：先发 foundation 到 npm → 再发主包（主包 tarball 里 workspace:^ 会自动改写出实际版本）。
+ *
+ * 流程（一个步骤都不能少）：
+ *   sync（未提交 → git add -A + commit；本地领先 → push；落后 → 中止）→
+ *   门禁（typecheck + test + build，含 foundation）→
+ *   bump 主包 version + 同步 bump foundation version（同号）→ commit + tag → 发 foundation → 发主包 →
+ *   git push 分支 + tag → GitHub Release（best-effort）→ vsce package + publish（失败降级只发 npm）。
  *
  * `--dry-run` 只打印计划（版本 + 步骤），不修改任何东西。
  *
  * 注意：
- *  - pnpm 包与 VSCode 扩展共用 package.json 的 version（单包设计）。
- *  - npm registry 上 `promptdown` 已被他人占用，发布 npm 用 publishConfig.name 声明
- *    scoped 名 `@andares/promptdown`（--access=public）；package.json 的 name 保持
- *    `promptdown` 供 vsce 使用（扩展 ID = andares.promptdown）。
- *  - 发布的 tarball 只含 dist/docs/skill 等（.npmignore 控制——pnpm
- *    复用 npm 的发布文件机制），本脚本与 PLAN.md 不发布。
+ *  - npm registry 上 `promptdown` 被占用，主包 publishConfig.name = @andares/promptdown（--access=public）；
+ *    foundation 包名即 @andares/pdfoundation（scoped，--access=public）。
+ *  - foundation 没有独立 tag/git 操作：它不新开 commit，版本号随主包 release commit 一起进 git。
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -36,9 +33,11 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PKG_PATH = join(ROOT, "package.json");
+const FOUNDATION_PKG_PATH = join(ROOT, "packages", "pdfoundation", "package.json");
 const BUMPS = ["major", "minor", "patch"];
 
 const NPM_NAME = "@andares/promptdown";
+const FOUNDATION_NAME = "@andares/pdfoundation";
 const curl = process.platform === "win32" ? "curl.exe" : "curl";
 
 const C = {
@@ -53,26 +52,26 @@ const C = {
 const rawArgs = process.argv.slice(2).filter((a) => a !== "--");
 const dryRun = rawArgs.includes("--dry-run");
 const positional = rawArgs.filter((a) => a !== "--dry-run");
-const mode = positional[0] === "all" ? "all" : "release";
-const arg = mode === "all" ? positional[1] : positional[0];
 
-if (mode === "release" && !BUMPS.includes(arg)) {
+// 只接受 all 模式（本脚本即 all）：主包 + foundation 强绑定，独立 npm 发布不再单独提供。
+// 拦截旧命令形态（release / release-all all）与无参/非法参数，防误操作。
+if (positional[0] === "release" || positional[0] === "all") {
 	console.error(
-		`${C.red}${C.bold}Usage: pnpm release <${BUMPS.join("|")}>${C.reset}` +
-			`\n  Bump the package version, publish npm, then push branch + tags (exactly one argument).` +
-			`\n  Add --dry-run to preview without changing anything.`,
+		`${C.red}${C.bold}独立 npm 发布已合并进 release-all（foundation 与主包同号强绑定）。${C.reset}` +
+			`\n  请使用: pnpm release-all <${BUMPS.join("|")}> [--dry-run]${C.reset}` +
+			`\n  editor 独立发布: pnpm release-editor <${BUMPS.join("|")}> [--dry-run]${C.reset}`,
 	);
 	process.exit(1);
 }
-if (mode === "all" && !BUMPS.includes(arg)) {
+const arg = positional[0];
+if (!BUMPS.includes(arg)) {
 	console.error(
-		`${C.red}${C.bold}Usage: pnpm release-all <${BUMPS.join("|")}>${C.reset}` +
-			`\n  Bump and publish npm + VSCode; npm failure aborts, vsce failure degrades to npm-only.` +
-			`\n  Add --dry-run to preview without changing anything.`,
+		`${C.red}${C.bold}Usage: pnpm release-all <${BUMPS.join("|")}> [--dry-run]${C.reset}` +
+			`\n  Bump + publish @andares/pdfoundation → @andares/promptdown → vsce; npm failure aborts, vsce failure degrades.`,
 	);
 	process.exit(1);
 }
-if (positional.length > (mode === "all" ? 2 : 1)) {
+if (positional.length > 1) {
 	console.error(
 		`${C.red}Too many arguments. Expected: <${BUMPS.join("|")}> [--dry-run]${C.reset}`,
 	);
@@ -111,7 +110,8 @@ const ghRepo = repoMatch
 	: "andares/promptdown";
 
 console.log(
-	`${C.dim}${mode}${C.reset} ${C.bold}${current}${C.reset} → ${C.bold}${C.green}${next}${C.reset} (${arg})`,
+	`${C.dim}release-all${C.reset} ${C.bold}${current}${C.reset} → ${C.bold}${C.green}${next}${C.reset} (${arg})` +
+		` · foundation 同号 ${C.bold}${FOUNDATION_NAME}@${next}${C.reset}`,
 );
 
 function step(label) {
@@ -165,7 +165,7 @@ const branch = run(git, ["branch", "--show-current"], {
 if (!branch) {
 	console.error(
 		`${C.red}无法确定当前分支（detached HEAD？）— 中止。` +
-			`请在目标分支上运行 release。${C.reset}`,
+			`请在目标分支上运行 release-all。${C.reset}`,
 	);
 	process.exit(1);
 }
@@ -175,8 +175,10 @@ if (dryRun) {
 	console.log(
 		`  0. sync：未提交改动 → git add -A + commit；未推送 → git push origin ${branch}（无则跳过）`,
 	);
-	console.log(`  1. pnpm typecheck && pnpm test && pnpm build`);
-	console.log(`  2. bump package.json version → ${next}`);
+	console.log(`  1. pnpm typecheck && pnpm test && pnpm build（含 foundation 门禁）`);
+	console.log(
+		`  2. bump 主包 package.json version → ${next} + 同步 bump packages/pdfoundation version → ${next}（同号绑定）`,
+	);
 	if (tagExists(`v${next}`)) {
 		const tagCommit = run(
 			git,
@@ -206,29 +208,28 @@ if (dryRun) {
 		);
 	}
 	console.log(
-		`  4. pnpm publish --no-git-checks --access=public（publishConfig.name: ${NPM_NAME}）`,
+		`  4. pnpm --filter ${FOUNDATION_NAME} publish --no-git-checks --access=public（foundation v${next}）`,
 	);
 	console.log(
-		`  5. git push origin ${branch} refs/tags/v${next}（best-effort）`,
+		`  5. pnpm publish --no-git-checks --access=public（publishConfig.name: ${NPM_NAME}，workspace:^ → ^${next}）`,
 	);
 	console.log(
-		`  6. 创建 GitHub Release v${next}` +
+		`  6. git push origin ${branch} refs/tags/v${next}（best-effort）`,
+	);
+	console.log(
+		`  7. 创建 GitHub Release v${next}` +
 			(process.env.GITHUB_TOKEN
 				? ""
 				: `（未设置 GITHUB_TOKEN → 跳过 Release）`),
 	);
-	if (mode === "all") {
-		console.log(
-			`  7. pnpm exec vsce package --no-dependencies → promptdown-${next}.vsix`,
-		);
-		console.log(
-			vsceCred
-				? `  8. pnpm exec vsce publish（release-all 必走，检测到凭据）`
-				: `  8. pnpm exec vsce publish（release-all 必走，但无 vsce 凭据 → 仅提示）`,
-		);
-	} else {
-		console.log(`     （release 模式：到此为止，无 vsce 步骤）`);
-	}
+	console.log(
+		`  8. pnpm exec vsce package --no-dependencies → promptdown-${next}.vsix`,
+	);
+	console.log(
+		vsceCred
+			? `  9. pnpm exec vsce publish（检测到凭据）`
+			: `  9. pnpm exec vsce publish（无 vsce 凭据 → 仅提示，npm 已发布）`,
+	);
 	process.exit(0);
 }
 // 0. Sync — 把未同步的改动先落到 git 并推到远端，保证后续的 release
@@ -275,7 +276,7 @@ if (hasUpstream) {
 	if (behind > 0) {
 		console.error(
 			`${C.red}本地落后 origin/${branch} ${behind} 个 commit — 中止。` +
-				`\n  请先同步（git pull --rebase origin ${branch}）再重跑 release。${C.reset}`,
+				`\n  请先同步（git pull --rebase origin ${branch}）再重跑 release-all。${C.reset}`,
 		);
 		process.exit(1);
 	}
@@ -304,41 +305,86 @@ if (hasUpstream) {
 }
 
 // 1. Checks gate — abort before anything is changed if they fail.
-step("typecheck + test + build");
+//    含 foundation 门禁（主包 build 链已触发 foundation build；这里补 test）。
+step("typecheck + test + build（含 foundation）");
 run(pnpm, ["typecheck"]);
 run(pnpm, ["test"]);
+run(pnpm, ["--filter", FOUNDATION_NAME, "test"]);
 run(pnpm, ["build"]);
 
-// 2. Bump package.json (preserve formatting: 2-space indent + trailing newline).
-step(`bump version → ${next}`);
+// 2. Bump 主包 version + 同步 bump foundation version（同号绑定）。
+//    格式化保持 2-space indent + trailing newline。
+step(`bump 主包 + foundation 版本 → ${next}（同号）`);
 pkg.version = next;
 writeFileSync(PKG_PATH, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
 
+let fpkg;
+try {
+	fpkg = JSON.parse(readFileSync(FOUNDATION_PKG_PATH, "utf8"));
+} catch {
+	console.error(
+		`${C.red}packages/pdfoundation/package.json is missing or not valid JSON: ${FOUNDATION_PKG_PATH}${C.reset}`,
+	);
+	process.exit(1);
+}
+if (typeof fpkg.version !== "string") {
+	console.error(
+		`${C.red}Unexpected foundation package.json version: ${JSON.stringify(fpkg.version)}${C.reset}`,
+	);
+	process.exit(1);
+}
+if (fpkg.version !== current) {
+	console.warn(
+		`${C.yellow}注意：foundation 当前版本 ${fpkg.version} 与主包 ${current} 不一致` +
+			`（绑定前历史遗留）。本次将直接同步为 ${next}。${C.reset}`,
+	);
+}
+fpkg.version = next;
+writeFileSync(
+	FOUNDATION_PKG_PATH,
+	`${JSON.stringify(fpkg, null, 2)}\n`,
+	"utf8",
+);
+
 // 3. Commit，然后调用 tag-current.mjs 打 tag（内部检测已存在 → 不重复打）。
-// 此时 package.json 已是新版本，打出的 v${next} 恰好指向 release commit。
+//    两个 package.json 的 version 均已在 commit 中体现；v${next} 指向 release commit。
 step(`git commit + tag v${next}`);
-run(git, ["add", "package.json"]);
+run(git, ["add", "package.json", FOUNDATION_PKG_PATH]);
 run(git, ["commit", "-m", `chore: release v${next}`]);
 run(process.execPath, [join(ROOT, "scripts", "tag-current.mjs")]);
 
-// 4. Publish pnpm (prepublishOnly re-gates with typecheck + test + build).
-// 包名走 package.json 的 publishConfig.name（@andares/promptdown），不再临时改 package.json。
-// package.json 的 name 保持 promptdown（vsce 需要非 scoped 名，扩展 ID = andares.promptdown）。
+// 4. 先发 foundation：主包 tarball 里 workspace:^ 在发布时被 pnpm 改写为 ^${next}，
+//    所以 foundation 必须先上 npm（否则主包发布后消费者装不到依赖）。
+//    foundation 无 prepublishOnly，发布前门禁已含它的 test/build。
+step(`pnpm --filter ${FOUNDATION_NAME} publish（foundation v${next}）`);
+const fpub = run(
+	pnpm,
+	["--filter", FOUNDATION_NAME, "publish", "--no-git-checks", "--access=public"],
+	{ allowFailure: true },
+);
+if (fpub.status !== 0) {
+	console.error(
+		`${C.red}foundation publish failed — 流程中止（版本已锚定在 ${next}）。` +
+			`\n  未产生 npm 发布；git 侧有一个 release commit（可保留或 reset）。${C.reset}`,
+	);
+	process.exit(fpub.status ?? 1);
+}
+
+// 5. Publish 主包（prepublishOnly 再跑门禁）。
 step(`pnpm publish（publishConfig.name: ${NPM_NAME}）`);
 const publish = run(pnpm, ["publish", "--no-git-checks", "--access=public"], {
 	allowFailure: true,
 });
 if (publish.status !== 0) {
 	console.error(
-		`${C.red}npm publish failed — 流程中止（版本已锚定在 ${next}）。` +
+		`${C.red}主包 npm publish failed — 流程中止（版本已锚定在 ${next}，foundation 已发布）。` +
 			`\n  To roll back: git tag -d v${next} && git reset --hard HEAD~1${C.reset}`,
 	);
 	process.exit(publish.status ?? 1);
 }
 
-// 5. push 分支 + tags（两种模式都做；失败仅警告——可能此前已推过）。
-//    然后创建 GitHub Release v${next}（两种模式都做，best-effort：
-//    未设 token / 已存在 / 失败都只提示，不中止）。
+// 6. push 分支 + tags（失败仅警告——可能此前已推过）。
+//    然后创建 GitHub Release v${next}（best-effort：未设 token / 已存在 / 失败都只提示）。
 step("git push（分支 + tag）");
 const push = run(git, ["push", "origin", branch, `refs/tags/v${next}`], {
 	allowFailure: true,
@@ -364,8 +410,6 @@ if (!process.env.GITHUB_TOKEN) {
 		},
 	).status !== 0
 ) {
-	// push 是 best-effort，可能失败——此时 GitHub 会为不存在的 tag 自动
-	// 创建指向远程默认分支 tip 的 Release，内容错误，故先跳过创建。
 	console.warn(
 		`${C.yellow}tag v${next} 尚未推送到远端 — 跳过 GitHub Release 创建。` +
 			`\n  稍后可手动: git push origin refs/tags/v${next}，再手动创建 Release。${C.reset}`,
@@ -430,48 +474,42 @@ if (!process.env.GITHUB_TOKEN) {
 	}
 }
 
-// 6. Package VSCode extension (.vsix).（仅 release-all）
-if (mode === "all") {
-	step("pnpm exec vsce package --no-dependencies");
-	const vsce = run(pnpm, ["exec", "vsce", "package", "--no-dependencies"], {
-		allowFailure: true,
-	});
-	if (vsce.status !== 0) {
-		console.warn(
-			`${C.yellow}vsce package failed — pnpm 已发布，但 .vsix 未生成。` +
-				`\n  可手动运行: pnpm exec vsce package --no-dependencies${C.reset}`,
-		);
-	} else {
-		console.log(`${C.dim}vsix: ${ROOT}/promptdown-${next}.vsix${C.reset}`);
-	}
+// 7. Package VSCode extension (.vsix)。（失败降级为只发 npm）
+step("pnpm exec vsce package --no-dependencies");
+const vsce = run(pnpm, ["exec", "vsce", "package", "--no-dependencies"], {
+	allowFailure: true,
+});
+if (vsce.status !== 0) {
+	console.warn(
+		`${C.yellow}vsce package failed — pnpm 已发布，但 .vsix 未生成。` +
+			`\n  可手动运行: pnpm exec vsce package --no-dependencies${C.reset}`,
+	);
+} else {
+	console.log(`${C.dim}vsix: ${ROOT}/promptdown-${next}.vsix${C.reset}`);
 }
 
-// 7. Publish to the VSCode Marketplace.（仅 release-all）
-if (mode === "all") {
-	step("pnpm exec vsce publish");
-	if (!vsceCred) {
+// 8. Publish to the VSCode Marketplace.（凭据缺失 → 降级提示）
+step("pnpm exec vsce publish");
+if (!vsceCred) {
+	console.warn(
+		`${C.yellow}无 vsce 凭据（VSCE_PAT 未设置，~/.vsce 也没有 publisher 凭据）— 无法发布扩展。` +
+			`npm 已发布 v${next}，` +
+			`\n  稍后可手动: pnpm exec vsce login andares 或 export VSCE_PAT=... && pnpm exec vsce publish${C.reset}`,
+	);
+} else {
+	const vp = run(
+		pnpm,
+		["exec", "vsce", "publish", "--skip-duplicate", "--no-dependencies"],
+		{ allowFailure: true },
+	);
+	if (vp.status !== 0) {
 		console.warn(
-			`${C.yellow}无 vsce 凭据（VSCE_PAT 未设置，~/.vsce 也没有 publisher 凭据）— 无法发布扩展。` +
-				`npm 已发布 v${next}，` +
-				`\n  稍后可手动: pnpm exec vsce login andares 或 export VSCE_PAT=... && pnpm exec vsce publish${C.reset}`,
+			`${C.yellow}vsce publish failed — npm 已发布 v${next}，扩展需手动上传 .vsix。${C.reset}`,
 		);
-	} else {
-		const vp = run(
-			pnpm,
-			["exec", "vsce", "publish", "--skip-duplicate", "--no-dependencies"],
-			{ allowFailure: true },
-		);
-		if (vp.status !== 0) {
-			console.warn(
-				`${C.yellow}vsce publish failed — npm 已发布 v${next}，扩展需手动上传 .vsix。${C.reset}`,
-			);
-		}
 	}
 }
 
 console.log(
 	`\n${C.green}${C.bold}✅ Released v${current} → v${next}${C.reset}` +
-		`\n${C.dim}Tag: v${next} · commit: chore: release v${next} · pnpm + GitHub Release` +
-		(mode === "all" ? ` + vsix` : ``) +
-		`${C.reset}`,
+		`\n${C.dim}Tag: v${next} · commit: chore: release v${next} · @andares/pdfoundation@${next} + npm + GitHub Release + vsix${C.reset}`,
 );

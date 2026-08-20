@@ -1,0 +1,11 @@
+title = "promptdown gitleaks config"
+
+# .firecrawl/ 是外部抓取缓存（firecrawl 工具产物，gitignored，不进版本库/VSIX/tarball），
+# 内容含第三方页面镜像（GitHub 图片签名 URL、外部搜索结果等），非本仓凭证——排除扫描。
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  '''\.firecrawl/''',
+]
