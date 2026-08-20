@@ -1,18 +1,19 @@
 import { basename, extname } from "node:path";
 import * as vscode from "vscode";
-import { format } from "./format";
-import {
-	detectPdIntent,
-	isPdMarkerLine,
-	mayBeCommentLine,
-} from "./auto-detect";
-import { jsonToPdText, type JsonToPdResult } from "./jsonToPd";
-import { nameSections, splitSections, type Section } from "./parser/expand";
 import {
 	compilePdText,
-	pdToJsonText,
+	detectPdIntent,
 	detectTransformKind,
-} from "./pdtransform";
+	format,
+	isPdMarkerLine,
+	jsonToPdText,
+	mayBeCommentLine,
+	nameSections,
+	pdToJsonText,
+	splitSections,
+	type JsonToPdResult,
+	type Section,
+} from "@andares/pdfoundation";
 import { isListItemLine, listItemWsRun, tabUnit } from "./tab";
 
 const PD_LANGUAGE = "promptdown";
@@ -321,7 +322,14 @@ export function activate(context: vscode.ExtensionContext): void {
 		if (document.languageId === PD_LANGUAGE) return;
 
 		switched.add(uri);
-		void vscode.languages.setTextDocumentLanguage(document, PD_LANGUAGE);
+		// 切换失败（如文档并发关闭/语言被占用）时回滚标记，允许下一次输入重试
+		void vscode.languages.setTextDocumentLanguage(
+			document,
+			PD_LANGUAGE,
+		).then(
+			() => undefined, // 成功：保持标记（本会话不再切）
+			() => switched.delete(uri), // 失败：允许重试
+		);
 	}
 
 	// 打开时：扫前 50 行，出现 //!pd 段标记行即切换
@@ -330,6 +338,12 @@ export function activate(context: vscode.ExtensionContext): void {
 			if (detectPdIntent(document.getText())) switchDocument(document);
 		}),
 	);
+
+	// 激活补扫：onStartupFinished 激活晚于会话恢复的文档打开事件——
+	// 恢复的 untitled（含 //!pd）等已打开文档在此补一次检测，不依赖错过的事件
+	for (const document of vscode.workspace.textDocuments) {
+		if (detectPdIntent(document.getText())) switchDocument(document);
+	}
 
 	// 输入时：三层预筛（语言 → 行首注释特征 → 段标记行），把正则执行压到最低
 	context.subscriptions.push(
