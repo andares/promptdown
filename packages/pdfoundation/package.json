@@ -1,6 +1,6 @@
 {
   "name": "@andares/pdfoundation",
-  "version": "0.2.0",
+  "version": "0.9.1",
   "description": "promptdown 的共享语义核心：解析 / 格式化 / 双向转换（零运行时依赖，Node 与 Web 通用）",
   "type": "module",
   "license": "MIT",
