@@ -341,7 +341,7 @@ F6 = ["select_all", "yank"]       # 一键全选复制全文到系统剪贴板�
 
 ## 🧩 多端一致性（语法规则同步状态）
 
-pd 语法在四端实现，语义以 **TS 核心**（`src/parser/*`，解析/转换/格式化的唯一事实）为准，其余各端为**显示层**：
+pd 语法在四端实现，语义以 **TS 核心**（`packages/pdfoundation/` 共享包 @andares/pdfoundation，解析/转换/格式化的唯一事实）为准，其余各端为**显示层**：
 
 | 规则 | TS 核心 | VSCode（TextMate） | Helix（tree-sitter） |
 | --- | --- | --- | --- |
@@ -384,14 +384,14 @@ pd 语法在四端实现，语义以 **TS 核心**（`src/parser/*`，解析/转
 
 ## 🛠️ 开发
 
-- **Web 输入框组件**：[packages/editor/](https://github.com/andares/promptdown/tree/master/packages/editor)（npm 包 @andares/pdeditor）——headless 提示词输入框（pd/md/xml/json/yaml 高亮），基于 Yace；含 pd-only 精简入口（`@andares/pdeditor/pd`，不含 Prism，~17 kB）；`pnpm --filter @andares/pdeditor dev` 起 demo
+- **Web 输入框组件**：[packages/editor/](https://github.com/andares/promptdown/tree/master/packages/editor)（npm 包 @andares/pdeditor）——headless 提示词输入框（pd/md/xml/json/yaml 高亮），基于 Yace；含 pd-only 精简入口（`@andares/pdeditor/pd`，不含 Prism，~17 kB），该入口另 re-export 共享语义包（`format` / `jsonToPdText` / `pdToJsonText` / `highlightPd`）；`pnpm --filter @andares/pdeditor dev` 起 demo
 - **性能基准**：`pnpm perf`（10 副本样本 2099 行/150 段全链路基准）；`pnpm perf:gen [份数]` 重新生成样本（`perf/generated/` 不入库）
 - **1.0 路线**：见 [`docs/ROADMAP-1.0.md`](docs/ROADMAP-1.0.md)（API 冻结声明 + 全端对齐确认 + 发布节奏）
 
 ```bash
 pnpm install
 pnpm typecheck   # 类型检查
-pnpm test        # node:test（12+ 用例覆盖全部语法规则）
+pnpm test        # node:test（壳层 + CLI 集成；语义规则 173 用例在 packages/pdfoundation）
 pnpm build       # tsc → dist/
 pnpm package     # 以 --no-dependencies 打包 .vsix
 ```
@@ -413,11 +413,12 @@ pnpm release patch -- --dry-run   # 先预览计划
 ```text
 promptdown/
 ├── icons/pd-icon.png   # 扩展品牌图标 + .pd 文件图标
-├── src/parser/          # 语法引擎（lexer → parser → toJson → expand）
 ├── src/cli.ts           # pdtransform CLI（自动识别 pd/json 双向转换）
 ├── src/compile-cli.ts   # pdcompile CLI（多段编译为单份完整 pd）
-├── src/jsonToPd.ts      # JSON → pd 渲染器
-├── src/pdtransform.ts   # 转换与识别逻辑（pdToJsonText / compilePdText / detectTransformKind）
+├── src/format-cli.ts    # pdformat CLI（格式化）
+├── src/extension.ts     # VSCode 扩展（命令 + 格式化 + Tab）
+├── packages/pdfoundation/  # ⭐ 共享语义核心 @andares/pdfoundation（parser/format/转换，主包与 pdeditor 共用）
+├── packages/editor/     # headless 输入框组件 @andares/pdeditor
 ├── syntaxes/            # TextMate 语法高亮
 ├── docs/SPEC.md         # ⭐ 语法规范（唯一事实来源）
 ├── skill/               # AI skill（容器：promptdown/ 解析版 + pd-author/ 作者版）

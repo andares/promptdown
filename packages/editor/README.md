@@ -17,7 +17,7 @@ npm install @andares/pdeditor
 
 ## 入口选择与 tree-shaking
 
-同一个包两个入口，**选择入口即完成裁剪**——两个产物都是预打包自包含单文件（无运行时依赖，`sideEffects: false`），消费方的 bundler 无需做模块级摇树：
+同一个包两个入口，**选择入口即完成裁剪**——高亮/运行时依赖（yace、es-toolkit、Prism）均预打包进产物（`sideEffects: false`），消费方 bundler 无需做模块级摇树；仅**共享语义包 `@andares/pdfoundation` 保持 external**——两个入口都 re-export `format` / `jsonToPdText` / `pdToJsonText`（另含自研 `highlightPd`），运行时由消费方按 peerDependencies 提供，语义单一来源、零漂移：
 
 | 入口 | import | 内置高亮 | 产物体积（min 前 / gzip） | 适用 |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ import { createPdEditor } from "@andares/pdeditor/pd";
 - 两个入口的 API 完全一致（同一 `createPdEditor` 工厂，仅内置高亮管线不同）
 - pd-only 入口下 `setLanguage("md")` 不报错：内容以纯文本渲染，无高亮
 - 任何时候都可用 `options.highlight` 自带高亮器（BYO）覆盖内置管线——精简入口 + BYO 即可按需补其它语言
-- 消费验证：vite 项目引 `/pd` 入口构建产物 ~13 kB（gzip ~4.7 kB）、无 Prism 痕迹；包无任何 runtime 依赖（yace/prismjs/es-toolkit 均已内联进 dist，仅开发期使用）
+- 消费验证：vite 项目引 `/pd` 入口构建产物 ~13 kB（gzip ~4.7 kB）、无 Prism 痕迹；除 peer `@andares/pdfoundation` 外的依赖均已内联进 dist（仅开发期使用）
 
 ## 用法
 

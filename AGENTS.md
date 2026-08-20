@@ -36,23 +36,32 @@
 | `pnpm release <patch\|minor\|major>` | 一键发布 npm：校验 → 测试 → bump → commit+tag → publish → vsce package |
 | `pnpm release-all <patch\|minor\|major>` | npm + VSCode 一起发：npm 失败中止；npm 成功后推 GitHub + 建 Release（需 `GITHUB_TOKEN`，best-effort），vsce 失败降级为只发 npm |
 | `pnpm release-editor <patch\|minor\|major>` | 发布组件包 `@andares/pdeditor`（packages/editor）：**纯 npm 流程**——组件门禁（typecheck+test+build）→ bump → pnpm publish；**无任何 git 操作**（不 commit / tag / push / GitHub Release——editor 独立版本号，不进仓库 git 历史与 tag；bump 留在工作区由使用者自行提交；`--dry-run` 预览） |
+| `pnpm release-foundation <patch\|minor\|major>` | 发布共享语义包 `@andares/pdfoundation`（packages/pdfoundation）：**纯 npm 流程**，与 release-editor 同模式（门禁 → bump → publish，无 git 操作）；**不在 release-all 范围**——主包发布前需先发本包（主包 dependencies 用 `workspace:^`，发布时 pnpm 自动改写为实际版本） |
 | `pnpm tag-current` | 给当前版本打本地 tag `vX.Y.Z`（已存在则跳过，不推送） |
 
 ## Architecture
 
 ```text
-src/
-├── cli.ts            # pdtransform 入口：自动识别 pd/json → 双向转换 → 打印
-├── compile-cli.ts    # pdcompile 入口：多文件合并段列表 → 选段 → 展开 → format
-├── jsonToPd.ts       # JSON → pd 渲染器（toJson 反向：值类型/Subject/丢弃规则）
-├── format.ts         # 格式化：键值规范化 + 顶层缩进修正 + 空行规则 + 行内代码/围栏保护
-├── pdtransform.ts    # pdToJsonText + compilePdText + detectTransformKind
+src/                        # 主包：VSCode 扩展 + CLI 壳层（语义在 @andares/pdfoundation）
+├── extension.ts            # VSCode 扩展：pdtransform/pdcompile 命令 + 格式化程序 + Tab 行为
+├── cli.ts                  # pdtransform CLI 入口：自动识别 pd/json → 双向转换 → 打印
+├── compile-cli.ts          # pdcompile CLI 入口：多文件合并段列表 → 选段 → 展开 → format
+├── format-cli.ts           # pdformat CLI 入口
+└── tab.ts                  # Tab 键缩进/缩出（扩展专用，listItemWsRun/tabUnit）
+
+packages/pdfoundation/      # 共享语义核心 @andares/pdfoundation（零运行时依赖，见下节）
+├── format.ts               # 格式化：键值规范化 + 顶层缩进修正 + 空行规则 + 行内代码/围栏保护
+├── pdtransform.ts          # pdToJsonText + compilePdText + detectTransformKind
+├── jsonToPd.ts             # JSON → pd 渲染器（toJson 反向：值类型/Subject/丢弃规则）
+├── auto-detect.ts          # pd 意图检测（detectPdIntent/isPdMarkerLine/mayBeCommentLine）
 └── parser/
-    ├── types.ts      # PLine / Block（AST）/ PdDoc / PError
-    ├── lexer.ts      # 行分类：section/separator/key/item-key/item/text/blank（行内代码豁免）
-    ├── parser.ts     # 块栈构建：缩进找爸爸 + Subject + 顶层 `- ` 缩进报错
-    ├── toJson.ts     # 树 → JSON（单条折叠：inline 且无子键 → 字符串）
-    └── expand.ts     # 段切分（围栏感知）+ nameSections/resolveSection 寻址 + `:refname`/`:%N` 引用展开
+    ├── types.ts            # PLine / Block（AST）/ PdDoc / PError
+    ├── lexer.ts            # 行分类：section/separator/key/item-key/item/text/blank（行内代码豁免）
+    ├── parser.ts           # 块栈构建：缩进找爸爸 + Subject + 顶层 `- ` 缩进报错
+    ├── toJson.ts           # 树 → JSON（单条折叠：inline 且无子键 → 字符串）
+    └── expand.ts           # 段切分（围栏感知）+ nameSections/resolveSection 寻址 + `:refname`/`:%N` 引用展开
+
+packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 ```
 
 **`docs/SPEC.md` 是语法规范的唯一事实来源**——grammar、parser、skill 全部以它为准。
@@ -104,6 +113,16 @@ src/
 
 发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`
 
+## 共享语义核心（@andares/pdfoundation）
+
+独立 workspace 包 `packages/pdfoundation/` → npm `@andares/pdfoundation`（零运行时依赖）：
+
+- **内容**：parser（lexer/parser/toJson/expand/types）+ format + pdtransform + jsonToPd + auto-detect——主包（VSCode 扩展 + CLI）与 `@andares/pdeditor`（pd 入口语义 re-export）**共同依赖**，语义单一来源，消除跨包漂移
+- **构建**：vite lib ESM/CJS 双格式（index.js / index.cjs）+ tsc d.ts；`sideEffects:false` 可树摇；零依赖（无需 external）
+- **消费**：主包用 CJS `require`（`moduleResolution: node` 靠顶层 `main`/`types` 兜底解析，非 exports）；Web 端经 editor pd 入口 re-export（external + peer）或直接 import
+- **发布**：独立版本、独立 npm 流程（`pnpm release-foundation <patch|minor|major>`，见 Commands），**不在 release-all 范围**；主包发布前需先发本包（主包 dependencies 用 `workspace:^`，pnpm 发布时自动改写为实际已发布版本）
+- **测试**：语义测试随包（tsx --test + fixtures，173 用例）；CLI 集成测试（spawn compile-cli）留在主包 test/
+
 ## Web 输入框组件（@andares/pdeditor，headless 优先）
 
 ### 当前目标（已实现 v0.1，见 packages/editor/）
@@ -113,15 +132,14 @@ src/
 - **形态**：纯背后控制，只渲染输入框内容 + 提供 API（`createPdEditor`，含 `setLanguage/setValue/getValue/destroy`）；无 UI chrome，核心维护 textarea/pre 覆盖层排版不变量，外部定义容器外观与 token 配色
 - **语言切换是 API 行为**（非 UI 切换器）：pd / md / xml / json / yaml（Prism 提供后四种）
 - **不是富文本**：pd 是纯代码文本，要精确不要样式——高亮服务于精确；排除富文本引擎（ProseMirror/Lexical/Slate）与 CM6/Monaco 本体
-- **不依赖主包**（避免包名耦合——主包文件内 name 为 promptdown、npm 发布名为 @andares/promptdown）：pd 高亮 tokenizer 在组件内自研（语义与 `src/parser/lexer.ts` 一致，见 `packages/editor/src/inline.ts`）；依赖主包语义工具（format/转换/段解析）属成品层未来方向
-- **格式化 / 转 JSON 未提供**（指 headless 包自身，demo 除外）：headless 当前只做渲染 + 编辑插件（回车续行、Tab/Shift+Tab 缩进），不含 format / 转换语义；外部框架可自行调主包 format 后 `setValue` 回写——demo 已实装该接入方式作参考（`packages/editor/demo/` 直引 `../../../src` 主包源码，vite bundle；有 `test/demo-smoke.test.ts` 防回归）
-- **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 测试 28 用例）
-- **demo 页**：`packages/editor/demo/`（vite dev 验证高亮/语言切换/中文 IME）
+- **不依赖主包**（主包 = VSCode 扩展，main 指向 dist/extension.js，浏览器不可 import）：pd 高亮 tokenizer 仍在组件内自研（语义与共享包 lexer 一致，见 `packages/editor/src/inline.ts`）；语义功能改走**共享语义包 @andares/pdfoundation**（见上节），不再直引主包源码
+- **语义 API：pd 入口 re-export @andares/pdfoundation**：`format` / `jsonToPdText` / `pdToJsonText`（external + peerDependency `@andares/pdfoundation`，产物零体积、零漂移——语义单一来源，语义包可独立发版）；`highlightPd` 也随 pd 入口导出（自研 tokenizer，供外部自定义渲染/复用）
+- **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 测试 53 用例）
+- **demo 页**：`packages/editor/demo/`（vite dev 验证高亮/语言切换/中文 IME/格式化/双向转换——demo 从共享包引语义，演示 external+peer 消费姿势；`test/demo-smoke.test.ts` 防回归）
 - 插件（yace 内置）：Tab 缩进 + 续行缩进默认启用
 
 ### 未来可选方向（不在本期实现）
 
-- **格式化 / 转 JSON**（语义功能，计划要做，优先级高于成品输入框）：headless 自身**未提供**；实现时需先解决依赖主包 format / pdtransform 语义的耦合问题（考虑抽共享语义包）——demo 直引主包源码已验证该链路可行（见 demo/ + demo-smoke 测试）
 - **成品输入框**（headless 核心 + UI 层，**不着急做**）：格式切换器（复用 detectTransformKind）、Ctrl+G 放大模式（大输入切 CM6 专用编辑器）、历史记录（localStorage/IndexedDB）、工具栏（段大纲等）
 - 主题系统（CSS 变量，参考 synesthesia）
 - 移动端/触屏适配、协同（Yjs）
