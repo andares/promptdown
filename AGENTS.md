@@ -34,7 +34,7 @@
 | `node dist/compile-cli.js <section> <file>...` | 多段编译为单份完整 pd（发布后为 `pdcompile`；跨文件合并段列表、引用内联展开、统一 format） |
 | `pnpm exec vsce package` | 生成 .vsix（或 `pnpm package`） |
 | `pnpm release-all <patch\|minor\|major>` | **唯一主包发布入口**：foundation（版本与主包同号）+ 主包 npm + push + GitHub Release + vsce；顺序固定 foundation→主包；npm 失败中止；vsce 失败降级为只发 npm |
-| `pnpm release-editor <patch\|minor\|major>` | 发布组件包 `@andares/pdeditor`（packages/editor）：**纯 npm 流程**——组件门禁（typecheck+test+build）→ bump → pnpm publish；**无任何 git 操作**（不 commit / tag / push / GitHub Release——editor 独立版本号，不进仓库 git 历史与 tag；bump 留在工作区由使用者自行提交；`--dry-run` 预览） |
+| `pnpm release-editor <patch\|minor\|major>` | 发布组件包 `@andares/pdeditor`（packages/editor）：**纯 npm 流程**——组件门禁（typecheck+test+build）→ bump → pnpm publish；**前置：@andares/pdfoundation 须已在 npm**（peer `workspace:^` 发布时改写为本地 foundation 版本，若该版本未上 npm，消费方安装会 ETARGET）；**无任何 git 操作**（不 commit / tag / push / GitHub Release——editor 独立版本号，不进仓库 git 历史与 tag；bump 留在工作区由使用者自行提交；`--dry-run` 预览） |
 | ~~`pnpm release`~~ / ~~`pnpm release-foundation`~~ | 已移除（并入 release-all）：主包与 foundation 同号强绑定，独立 npm 发布不再单独提供；误敲会被拦截提示改用 release-all / release-editor |
 | `pnpm tag-current` | 给当前版本打本地 tag `vX.Y.Z`（已存在则跳过，不推送） |
 
@@ -110,7 +110,7 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 脚本不再临时改包名；`package.json` 的 `name` 保持 `promptdown`（vsce 需要非 scoped 名，扩展 ID 为 `andares.promptdown`）。
 安装命令：`npm install -g @andares/promptdown`。
 
-发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`
+发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`——注意若 foundation 已发布则无法撤回（npm 不支持删版本），重跑将 bump 至下一版本、foundation 跳号跟随（无害）
 
 ## 共享语义核心（@andares/pdfoundation）
 

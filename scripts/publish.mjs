@@ -377,8 +377,10 @@ const publish = run(pnpm, ["publish", "--no-git-checks", "--access=public"], {
 });
 if (publish.status !== 0) {
 	console.error(
-		`${C.red}主包 npm publish failed — 流程中止（版本已锚定在 ${next}，foundation 已发布）。` +
-			`\n  To roll back: git tag -d v${next} && git reset --hard HEAD~1${C.reset}`,
+		`${C.red}主包 npm publish failed — 流程中止（版本已锚定在 ${next}）。${C.reset}` +
+			`\n  foundation v${next} 已发布到 npm、无法撤回（npm 不支持删版本）。` +
+			`\n  git 回滚: git tag -d v${next} && git reset --hard HEAD~1` +
+			`\n  重跑 release-all 将 bump 到下一版本，foundation 会跳号跟随（无害）。${C.reset}`,
 	);
 	process.exit(publish.status ?? 1);
 }

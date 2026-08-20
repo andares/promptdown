@@ -401,7 +401,7 @@ pnpm package     # 以 --no-dependencies 打包 .vsix
 ```bash
 pnpm release-all patch     # 唯一主包发布入口：foundation（同号）→ npm → push/tag → vsce
 pnpm release-editor patch  # editor 独立发布（纯 npm）
-pnpm release patch -- --dry-run  # 预览计划（误敲 release 会被拦截提示改用 release-all）
+pnpm release-all patch -- --dry-run  # 预览计划（不改动任何东西；旧 release 命令已移除）
 pnpm tag-current          # 给当前版本打本地 tag vX.Y.Z（已存在则跳过，不推送）
 ```
 
