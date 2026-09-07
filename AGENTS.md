@@ -46,7 +46,9 @@ src/                        # 主包：VSCode 扩展 + CLI 壳层（语义在 @a
 ├── cli.ts                  # pdtransform CLI 入口：自动识别 pd/json → 双向转换 → 打印
 ├── compile-cli.ts          # pdcompile CLI 入口：多文件合并段列表 → 选段 → 展开 → format
 ├── format-cli.ts           # pdformat CLI 入口
-└── tab.ts                  # Tab 键缩进/缩出（扩展专用，listItemWsRun/tabUnit）
+├── tab.ts                  # Tab 键缩进/缩出（扩展专用，listItemWsRun/tabUnit）
+├── enter.ts                # Enter 键清空子项标记行（扩展专用，isEmptyItemMarkerLine）
+└── version.ts              # CLI 通用 --version（pdVersion/handleVersionArg，三 CLI 共用）
 
 packages/pdfoundation/      # 共享语义核心 @andares/pdfoundation（零运行时依赖，见下节）
 ├── format.ts               # 格式化：键值规范化 + 顶层缩进修正 + 空行规则 + 行内代码/围栏保护
@@ -97,11 +99,21 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 2. **sync**：未提交改动 → 展示清单 + `git add -A` + commit `chore: sync uncommitted changes before release`；本地领先远端 → `git push origin <分支>`（失败中止）；本地落后远端 → 中止（提示 `git pull --rebase`）；都没有 → 跳过不推。保证 release commit 与 tag 建立在线上最新代码上，不会出现“文件没提交但 tag 已打”
 3. 门禁：typecheck + test + build（含 foundation 的 test），失败即中止
 4. bump 主包 `package.json` version + **同步 bump `packages/pdfoundation/package.json` version（同号）**（2 空格缩进 + 尾换行）
-5. `git commit -m "chore: release vX.Y.Z"`，然后调用 `scripts/tag-current.mjs` 打 tag（检测已存在 → 不重复打，指向 release commit）
-6. `pnpm --filter @andares/pdfoundation publish --no-git-checks --access=public`（foundation 先发）→ `pnpm publish --no-git-checks --access=public`（主包，prepublishOnly 再次门禁；任一处失败中止，回滚见下）
-7. `git push origin <当前分支> refs/tags/vX.Y.Z`（只推该 tag 非全量 --tags；尝试一次，失败仅警告——可能此前已推过）
-8. 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）且 tag 已到远端（`git ls-remote` 验证，push 失败时跳过避免 Release 指向错误 commit），就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；其他失败 → 仅警告）
-9. `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`；若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据，自动 `vsce publish`；否则提示手动补发
+5. **CHANGELOG 归档**：`CHANGELOG.dev.md`（开发期变更日志，见下节）存在且有条目 → 条目归档为 `CHANGELOG.md` 顶部 `## vX.Y.Z` 章节（锚 `# Changelog` 标题行后插入），删除 dev 文件，两者随 release commit 进 git；文件不存在或无条目 → 黄字提示跳过（纯依赖/内部提交可无记录）；`CHANGELOG.md` 缺锚点 → 红字中止
+6. `git commit -m "chore: release vX.Y.Z"`，然后调用 `scripts/tag-current.mjs` 打 tag（检测已存在 → 不重复打，指向 release commit）
+7. `pnpm --filter @andares/pdfoundation publish --no-git-checks --access=public`（foundation 先发）→ `pnpm publish --no-git-checks --access=public`（主包，prepublishOnly 再次门禁；任一处失败中止，回滚见下）
+8. `git push origin <当前分支> refs/tags/vX.Y.Z`（只推该 tag 非全量 --tags；尝试一次，失败仅警告——可能此前已推过）
+9. 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）且 tag 已到远端（`git ls-remote` 验证，push 失败时跳过避免 Release 指向错误 commit），就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；其他失败 → 仅警告）
+10. `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`；若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据，自动 `vsce publish`；否则提示手动补发
+
+## 变更日志约定（CHANGELOG.dev.md → CHANGELOG.md）
+
+**版本号是发布时才确定的，不是发布前加上去的**——开发期绝不知道下一个版本号是什么，因此**禁止在 CHANGELOG.md 里预写 `## X.Y.Z (未发布)` 章节**（历史上 0.7–0.10 的 "(未发布)" 标记是旧方案遗留，勿模仿）。规则：
+
+- **开发期**：agent/人在功能或修复提交时，把变更条目追加到根目录 **`CHANGELOG.dev.md`**（临时文件，文件头自带用途说明；不存在则按该头模板新建）。条目格式与 CHANGELOG.md 一致（`- **要点**：说明`，可带缩进子条目），**不写版本号**。每次提交把对应条目一并写好，不留到发布前补
+- **发布时（release-all 第 5 步，agent 不执行——发布由用户本人跑）**：脚本自动把 `CHANGELOG.dev.md` 的条目（滤掉标题/引用说明行）归档为 `CHANGELOG.md` 顶部 `## vX.Y.Z` 章节（X.Y.Z = 本次 bump 出的版本），随后删除 dev 文件；两者进 release commit
+- **无条目发布**：dev 文件缺失或只有说明 → 提示跳过，不阻塞（纯依赖/内部提交）
+- **release-editor 不处理变更日志**（editor 独立版本号，变更记录在 `packages/editor/CHANGELOG.md` 自行维护，不走 dev 归档）
 
 `pnpm tag-current` 可独立使用：给当前 HEAD 打本地 `v{version}` tag（已存在则跳过），**只打 tag 不推送**。
 

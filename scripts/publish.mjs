@@ -15,7 +15,9 @@
  * 流程（一个步骤都不能少）：
  *   sync（未提交 → git add -A + commit；本地领先 → push；落后 → 中止）→
  *   门禁（typecheck + test + build，含 foundation）→
- *   bump 主包 version + 同步 bump foundation version（同号）→ commit + tag → 发 foundation → 发主包 →
+ *   bump 主包 version + 同步 bump foundation version（同号）→
+ *   CHANGELOG 归档（CHANGELOG.dev.md 开发期条目 → CHANGELOG.md 顶部 "## vX.Y.Z"，删 dev 文件；无则提示跳过）→
+ *   commit + tag → 发 foundation → 发主包 →
  *   git push 分支 + tag → GitHub Release（best-effort）→ vsce package + publish（失败降级只发 npm）。
  *
  * `--dry-run` 只打印计划（版本 + 步骤），不修改任何东西。
@@ -26,7 +28,7 @@
  *  - foundation 没有独立 tag/git 操作：它不新开 commit，版本号随主包 release commit 一起进 git。
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +36,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PKG_PATH = join(ROOT, "package.json");
 const FOUNDATION_PKG_PATH = join(ROOT, "packages", "pdfoundation", "package.json");
+const CHANGELOG_PATH = join(ROOT, "CHANGELOG.md");
+const DEV_CHANGELOG_PATH = join(ROOT, "CHANGELOG.dev.md");
 const BUMPS = ["major", "minor", "patch"];
 
 const NPM_NAME = "@andares/promptdown";
@@ -178,6 +182,9 @@ if (dryRun) {
 	console.log(`  1. pnpm typecheck && pnpm test && pnpm build（含 foundation 门禁）`);
 	console.log(
 		`  2. bump 主包 package.json version → ${next} + 同步 bump packages/pdfoundation version → ${next}（同号绑定）`,
+	);
+	console.log(
+		`  2.5 CHANGELOG.dev.md 存在且有内容 → 归档为 CHANGELOG.md 顶部 "## v${next}" 章节（无则提示跳过）`,
 	);
 	if (tagExists(`v${next}`)) {
 		const tagCommit = run(
@@ -346,10 +353,58 @@ writeFileSync(
 	"utf8",
 );
 
+// 2.5 CHANGELOG 归档：开发期条目（CHANGELOG.dev.md）→ CHANGELOG.md 顶部新版本章节。
+//     版本号发布时才确定，开发期不预写；dev 文件归档后删除，随 release commit 一起进 git。
+step(`CHANGELOG.dev.md → CHANGELOG.md 顶部 "## v${next}"（归档开发期条目）`);
+let changedFiles = ["package.json", FOUNDATION_PKG_PATH];
+if (existsSync(DEV_CHANGELOG_PATH)) {
+	const devRaw = readFileSync(DEV_CHANGELOG_PATH, "utf8");
+	// 去掉头部的说明块（引用块 + 标题），只留条目列表
+	const entries = devRaw
+		.split("\n")
+		.filter((l) => !l.startsWith("#") && !l.startsWith(">"))
+		.join("\n")
+		.trim();
+	if (entries === "") {
+		console.log(
+			`${C.yellow}CHANGELOG.dev.md 无条目（纯说明/空白），跳过归档${C.reset}`,
+		);
+	} else {
+		const changelog = readFileSync(CHANGELOG_PATH, "utf8");
+		// 锚 "# Changelog" 标题行（其前可能有 icon 等 HTML 块），新章节插在标题后
+		const heading = "# Changelog\n";
+		const idx = changelog.indexOf(heading);
+		if (idx === -1) {
+			console.error(
+				`${C.red}CHANGELOG.md 缺少 "# Changelog" 标题锚点，无法归档 — 中止。${C.reset}`,
+			);
+			process.exit(1);
+		}
+		const section = `## v${next}\n\n${entries}\n`;
+		const insertAt = idx + heading.length;
+		writeFileSync(
+			CHANGELOG_PATH,
+			changelog.slice(0, insertAt) +
+				`\n${section}` +
+				changelog.slice(insertAt),
+			"utf8",
+		);
+		rmSync(DEV_CHANGELOG_PATH);
+		changedFiles = [...changedFiles, "CHANGELOG.md", "CHANGELOG.dev.md"];
+		console.log(
+			`${C.green}已归档 ${entries.split("\n").filter((l) => l.startsWith("- ")).length} 条到 "## v${next}"${C.reset}`,
+		);
+	}
+} else {
+	console.log(
+		`${C.yellow}无 CHANGELOG.dev.md（本次发布无开发期变更记录），跳过归档${C.reset}`,
+	);
+}
+
 // 3. Commit，然后调用 tag-current.mjs 打 tag（内部检测已存在 → 不重复打）。
 //    两个 package.json 的 version 均已在 commit 中体现；v${next} 指向 release commit。
 step(`git commit + tag v${next}`);
-run(git, ["add", "package.json", FOUNDATION_PKG_PATH]);
+run(git, ["add", ...changedFiles]);
 run(git, ["commit", "-m", `chore: release v${next}`]);
 run(process.execPath, [join(ROOT, "scripts", "tag-current.mjs")]);
 
