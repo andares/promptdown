@@ -199,6 +199,39 @@ function applyBlankLinesMulti(text: string): string {
 }
 
 /**
+ * 连续空行合并（格式化最后一步）：2 个及以上连续空行压缩为 1 个。
+ * 围栏 ``` 内的空行原样保留（“围栏内原样”不变量），仅围栏外生效。
+ */
+function collapseBlankRuns(text: string): string {
+	const lines = text.split("\n");
+	// 末尾 `\n` 产生的幻影空 part 不参与合并（保证“以换行结尾”不丢、末尾单个空行保留）
+	const endsWithNewline = lines.length > 1 && lines[lines.length - 1] === "";
+	const body = endsWithNewline ? lines.slice(0, -1) : lines;
+	const out: string[] = [];
+	let inFence = false;
+	let blankRun = false;
+	for (const raw of body) {
+		const trimmed = raw.trim();
+		if (inFence) {
+			out.push(raw);
+			if (trimmed.startsWith("```")) inFence = false;
+			continue;
+		}
+		if (trimmed === "") {
+			// 已有连续空行 → 丢弃（合并）
+			if (blankRun) continue;
+			blankRun = true;
+			out.push(raw);
+			continue;
+		}
+		blankRun = false;
+		out.push(raw);
+		if (trimmed.startsWith("```")) inFence = true;
+	}
+	return out.join("\n") + (endsWithNewline ? "\n" : "");
+}
+
+/**
  * 格式化 pd 文本：
  * 1. `:-` / `：-` 所在行不识别键值（行内代码段内不参与）
  * 2. 首个全角冒号，或两侧均无空格的首个半角冒号 → `: `
@@ -207,6 +240,7 @@ function applyBlankLinesMulti(text: string): string {
  * 5. 行尾空白清理（行内代码段内不动）
  * 6. ``` 围栏内行原样保留；` 行内代码整体字串（内部不做任何处理）
  * 7. 空行规则：顶层带子域键值后跟下一个顶层条目时中间空一行（多段按段应用）
+ * 8. 连续空行合并：2 个及以上连续空行压缩为 1 个（围栏内原样保留；最后一步执行）
  */
 export function format(text: string): string {
 	const rawLines = text.split(/\r?\n/);
@@ -232,5 +266,5 @@ export function format(text: string): string {
 		const fixLines = new Set(topIndent.map((e) => e.lineNo));
 		out = out.map((l, idx) => (fixLines.has(idx + 1) ? l.trimStart() : l));
 	}
-	return applyBlankLinesMulti(out.join("\n"));
+	return collapseBlankRuns(applyBlankLinesMulti(out.join("\n")));
 }

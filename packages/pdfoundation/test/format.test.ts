@@ -154,6 +154,38 @@ test("空行：item-key 子块（- sub:）也计入带子域", () => {
 	);
 });
 
+// ---- 连续空行合并（2 个及以上 → 1 个；围栏内原样） ----
+
+test("空行合并：多个连续空行压缩为 1 个", () => {
+	assert.equal(format("a: 1\n\n\n\nb: 2"), "a: 1\n\nb: 2");
+	assert.equal(format("a: 1\n \n\t\nb: 2"), "a: 1\n\nb: 2");
+	assert.equal(format("a: 1\n\nb: 2"), "a: 1\n\nb: 2"); // 单空行不动
+	assert.equal(format("a: 1\n\n\n\n"), "a: 1\n\n"); // 文末多个空行同样合并
+});
+
+test("空行合并：与空行插入规则协同（插 1 行不叠加、幂等）", () => {
+	// 已有空行 + 插入规则相邻 → 仍只有 1 个空行
+	assert.equal(format("name1:\n- a\n\n\n\nname2: b"), "name1:\n- a\n\nname2: b");
+	// 插入产生的单个空行不被破坏
+	assert.equal(format("name1:\n- a\nname2: b"), "name1:\n- a\n\nname2: b");
+});
+
+test("空行合并：围栏内连续空行原样保留", () => {
+	assert.equal(
+		format("```js\nconst a = 1;\n\n\n\nconst b = 2;\n```\nmsg: ok"),
+		"```js\nconst a = 1;\n\n\n\nconst b = 2;\n```\nmsg: ok",
+	);
+	// 围栏外仍合并
+	assert.equal(format("a: 1\n\n\n\n```js\nx\n\n\n```"), "a: 1\n\n```js\nx\n\n\n```");
+});
+
+test("空行合并：多段场景逐段生效（段间空行压缩）", () => {
+	assert.equal(
+		format("//!pd 甲\nk1: a\n\n\n\n//!pd 乙\nk2: b"),
+		"//!pd 甲\nk1: a\n\n//!pd 乙\nk2: b",
+	);
+});
+
 test("空文档 / 纯分隔线文档原样", () => {
 	assert.equal(format(""), "");
 	assert.equal(format("---\n---"), "---\n---");
