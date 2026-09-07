@@ -2,8 +2,9 @@
 import { readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
 import { nameSections, splitSections, type Section, compileSections } from "@andares/pdfoundation";
+import { handleVersionArg } from "./version";
 
-const USAGE = `用法: pdcompile <section> <file>[...<file>]
+const USAGE = `用法: pdcompile <section> <file>[...<file>] [--version]
 
 编译选中的段为单份完整 pd（引用内联展开 + 统一 format，输出到 stdout）：
 - <section>：段名，或 %序号（如 %1 = 第 1 个 section，从 1 开始，全局跨文件编号）
@@ -20,6 +21,7 @@ function fileStem(file: string): string {
 
 function main(): void {
 	const args = process.argv.slice(2);
+	handleVersionArg(args);
 	const sectionArg = args[0];
 	const files = args.slice(1);
 

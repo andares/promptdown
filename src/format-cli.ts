@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
 import { format } from "@andares/pdfoundation";
+import { handleVersionArg } from "./version";
 
-const USAGE = `用法: pdformat <file.pd> [-w|--write]
+const USAGE = `用法: pdformat <file.pd> [-w|--write] [--version]
 
 格式化 promptdown 文本：
 - 首个全角冒号或紧邻内容的首个半角冒号 → \`: \`
@@ -15,6 +16,7 @@ const USAGE = `用法: pdformat <file.pd> [-w|--write]
 
 function main(): void {
 	const args = process.argv.slice(2);
+	handleVersionArg(args);
 	const write = args.includes("-w") || args.includes("--write");
 	const file = args.find((a) => !a.startsWith("-"));
 

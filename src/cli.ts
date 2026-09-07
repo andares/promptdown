@@ -2,11 +2,12 @@
 import { readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
 import { format, jsonToPdText, detectTransformKind, pdToJsonText } from "@andares/pdfoundation";
+import { handleVersionArg } from "./version";
 
 const YELLOW = "\x1b[33m";
 const RESET = "\x1b[0m";
 
-const USAGE = `用法: pdtransform <file> [段名|%序号]
+const USAGE = `用法: pdtransform <file> [段名|%序号] [--version]
 
 promptdown ↔ JSON 双向转换（自动识别输入类型）：
 - .pd 文件 → 转 JSON（输出到 stdout）
@@ -23,6 +24,7 @@ function fileStem(file: string): string {
 
 function main(): void {
 	const args = process.argv.slice(2);
+	handleVersionArg(args);
 	const file = args[0];
 	const selector = args[1];
 

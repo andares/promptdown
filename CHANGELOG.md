@@ -4,6 +4,10 @@
 
 # Changelog
 
+## 0.10.0 (未发布)
+
+- **CLI 通用参数 `--version`**：`pdtransform` / `pdcompile` / `pdformat` 统一调用共享模块（`src/version.ts`）输出当前版本号（读包根 package.json），与其他参数共存时优先生效
+
 ## 0.9.0 (未发布)
 
 - **format 连续空行合并**：格式化最后一步把 2 个及以上连续空行压缩为 1 个（围栏内原样、末尾换行不丢）；全端生效（pdformat CLI / VSCode 格式化 / pdtransform / pdcompile / pdeditor）
