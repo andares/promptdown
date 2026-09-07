@@ -15,6 +15,7 @@ import {
 	type Section,
 } from "@andares/pdfoundation";
 import { isListItemLine, listItemWsRun, tabUnit } from "./tab";
+import { shouldClearItemOnEnter } from "./enter";
 
 const PD_LANGUAGE = "promptdown";
 /** 参与自动检测的语言：无格式归属的弱语法文件（untitled/txt/log 默认即 plaintext） */
@@ -263,11 +264,60 @@ function registerTabCommand(): vscode.Disposable {
 }
 
 /**
+ * Enter 键命令：所有光标都严格命中「空子项标记行（`<缩进>- `）行尾」时，
+ * 清掉该行标记（整行连同缩进清空）+ 新行落行首，光标定在新行 col 0 —— 
+ * 一键脱离子项层级、直接开始写顶层项（匹配 onEnterRules 续行生成的 `- ` 严格场景）。
+ * 其余任何情况（裸 `-`、行中光标、有选区、混合多光标）→ 完整还原默认回车
+ * （`default:type`，保留自动缩进 / 续行 / IME 等一切原生行为）。
+ */
+function registerEnterCommand(): vscode.Disposable {
+	return vscode.commands.registerTextEditorCommand(
+		"promptdown.enter",
+		(editor) => {
+			const doc = editor.document;
+			const matched = editor.selections.every((s) =>
+				shouldClearItemOnEnter(
+					doc.lineAt(s.active.line).text,
+					s.isEmpty,
+					s.active.character === doc.lineAt(s.active.line).text.length,
+				),
+			);
+			if (!matched) {
+				void vscode.commands.executeCommand("default:type", { text: "\n" });
+				return;
+			}
+			const lines = editor.selections.map((s) => s.active.line);
+			void editor
+				.edit((edit) => {
+					for (const line of new Set(lines)) {
+						const range = doc.lineAt(line).range;
+						edit.delete(range); // 清空整行（含缩进与 `- ` 标记）
+						edit.insert(range.end, "\n"); // 新行无缩进，落行首
+					}
+				})
+				.then((applied) => {
+					// 光标定在各新行 col 0（编辑后行号稳定：只在该行行尾插入换行）
+					if (applied) {
+						editor.selections = lines.map(
+							(l) =>
+								new vscode.Selection(
+									new vscode.Position(l + 1, 0),
+									new vscode.Position(l + 1, 0),
+								),
+						);
+					}
+				});
+		},
+	);
+}
+
+/**
  * promptdown 扩展入口：
  * 1. 注册文档格式化程序（promptdown 语言）
  * 2. pdtransform 命令：当前文档 PD ↔ JSON 双向转换（pd→JSON 新开 Untitled，JSON→pd 变更当前）
  * 3. pdcompile 命令：选中段编译为单份完整 pd（引用内联展开 + format），新开 Untitled
- * 4. //!pd 自动检测：untitled / 未知扩展名等弱语法文件中出现 //!pd 段标记行时，
+ * 4. Enter 键：空子项标记行（`- ` 行尾）再回车 → 清掉标记回到顶层行首
+ * 5. //!pd 自动检测：untitled / 未知扩展名等弱语法文件中出现 //!pd 段标记行时，
  *    把整个文档语言切换为 promptdown（打开时 + 输入时均检测）。
  */
 export function activate(context: vscode.ExtensionContext): void {
@@ -283,6 +333,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	// ---- Tab 键：序列项行（`-` 开头）整行右缩进，其余插入 tab ----
 	context.subscriptions.push(registerTabCommand());
+
+	// ---- Enter 键：空子项标记行（`- `）行尾回车 → 清标记回顶层 ----
+	context.subscriptions.push(registerEnterCommand());
 
 	// ---- 格式化程序（promptdown 语言） ----
 	context.subscriptions.push(

@@ -6,6 +6,8 @@
 
 ## 0.9.0 (未发布)
 
+- **format 连续空行合并**：格式化最后一步把 2 个及以上连续空行压缩为 1 个（围栏内原样、末尾换行不丢）；全端生效（pdformat CLI / VSCode 格式化 / pdtransform / pdcompile / pdeditor）
+- **VSCode 空子项行回车清标记**：在严格 `<缩进>- `（`-` 后带空白）的行尾再按回车，清掉原行标记与缩进、新行落行首（光标 col 0），一键脱离子项层级写顶层项；裸 `-` 与其他场景完整走默认回车行为
 - 新增 **`@andares/pdeditor`**（packages/editor/，独立 workspace 包）：headless 提示词输入框组件
   - 基于 Yace（~2KB 零依赖），pd/md/xml/json/yaml 五格式语法高亮（pd 自研 tokenizer 与主包 lexer 语义一致；其余用 Prism）
   - headless：零样式零 chrome，语言切换为 API（setLanguage），外观完全外部定义；内置 Tab 缩进/续行（Yace 插件）

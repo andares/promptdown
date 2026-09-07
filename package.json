@@ -55,6 +55,11 @@
         "command": "promptdown.tab",
         "key": "tab",
         "when": "editorTextFocus && editorLangId == promptdown && !editorReadonly && !suggestWidgetVisible && !inSnippets && !inlineSuggestionVisible && !hasOtherSuggestions"
+      },
+      {
+        "command": "promptdown.enter",
+        "key": "enter",
+        "when": "editorTextFocus && editorLangId == promptdown && !editorReadonly && !suggestWidgetVisible && !inSnippets && !inlineSuggestionVisible && !hasOtherSuggestions && !editorHoverVisible && !renameInputVisible"
       }
     ],
     "languages": [

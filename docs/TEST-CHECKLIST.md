@@ -18,10 +18,11 @@
   - 多段 pd（含 `//!pd 命名` 与匿名段）→ 弹 **QuickPick 选段**（`%序号 [段名]`）；取消则不动 ✅
   - 语法错误 pd（如顶层缩进的 `<code>- </code>`）→ 报错信息带行号，不炸编辑器
 - [ ] JSON 文档再跑 `PD格式转换` → 原地变回 pd（可 Ctrl+Z 撤销，语言自动切 promptdown）✅
-- [ ] 保存自动格式化（`registerDocumentFormattingEditProvider`）：全角冒号→半角、顶层 `<code>- </code>` 缩进修正、行尾空白清理
+- [ ] 保存自动格式化（`registerDocumentFormattingEditProvider`）：全角冒号→半角、顶层 `<code>- </code>` 缩进修正、行尾空白清理、连续空行合并（≥2 → 1，围栏内不动）
 - [ ] `PD编译分段`：当前 pd 选中段 → 编译为新 Untitled（引用内联展开）✅
 - [ ] 编辑行为回归：
   - 回车续行（序列项行自动补 `<code>- </code>`；普通行保留缩进）
+  - 空子项行（`<code>- </code>` 带空格）行尾回车 → 清标记回顶层（原行变空行、新行落行首）；裸 `-` 回车仍走退出列表
   - Tab 键：序列项行整行缩进 / Shift+Tab 缩出
 - [ ] 语法高亮：key/value / `- item` / `//!pd` section / 围栏 / `:ref` 引用配色正常
 - [ ] 内联代码 `` `a: b` `` 行内冒号**不**触发键值色
