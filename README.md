@@ -369,6 +369,19 @@ pd 语法在四端实现，语义以 **TS 核心**（`packages/pdfoundation/` �
 
 > 以上差异均为**高亮显示层**差异，不影响解析/转换结果（语义以 TS 核心为准）。
 
+## 🔒 API 与稳定性（1.0 起冻结）
+
+promptdown 由三个 npm 包组成，1.0 后以下公共面**冻结**（不可删除 / 改名 / 改签名；破坏性变更一律 2.0）：
+
+| 包 | 公共面 |
+| --- | --- |
+| `@andares/promptdown` | CLI 行为（`pdtransform` / `pdcompile` / `pdformat` / `--version`）、VSCode 贡献点（命令、语言 id `promptdown`、配置 `promptdown.autoDetect`、格式化程序、Tab/回车编辑行为）。**不导出 JS 语义 API**（已移至 foundation） |
+| `@andares/pdfoundation` | 语义 API：`format` / `pdToJsonText` / `jsonToPdText` / `compilePdText` / `compileSections` / `detectTransformKind` / `splitSections` / `nameSections` / `resolveSection` 等（完整清单见 [1.0 规划](docs/ROADMAP-1.0.md)） |
+| `@andares/pdeditor` | 组件 API：`createPdEditor` 与 `PdEditorOptions` 全部键；`/pd` 入口另含 `highlightPd`；两入口 re-export 语义 API |
+
+- **语法规范**：`docs/SPEC.md` 冻结——行类型、section 寻址、引用（含循环静默擦除）、格式化与转义/豁免矩阵；1.0 后只做非破坏性补充
+- **版本策略**：语义化版本；`@andares/pdfoundation` 与主包**同号绑定**（每次 `release-all` 一起发）；`@andares/pdeditor` 独立版本线
+
 ## 🤖 AI Skill
 
 两个 skill，按需安装：
@@ -395,7 +408,7 @@ pd 语法在四端实现，语义以 **TS 核心**（`packages/pdfoundation/` �
 ```bash
 pnpm install
 pnpm typecheck   # 类型检查
-pnpm test        # node:test（壳层 + CLI 集成；语义规则 173 用例在 packages/pdfoundation）
+pnpm test        # node:test（壳层 + CLI 集成；语义规则 178 用例在 packages/pdfoundation）
 pnpm build       # tsc → dist/
 pnpm package     # 以 --no-dependencies 打包 .vsix
 ```
@@ -420,13 +433,16 @@ promptdown/
 ├── src/cli.ts           # pdtransform CLI（自动识别 pd/json 双向转换）
 ├── src/compile-cli.ts   # pdcompile CLI（多段编译为单份完整 pd）
 ├── src/format-cli.ts    # pdformat CLI（格式化）
-├── src/extension.ts     # VSCode 扩展（命令 + 格式化 + Tab）
-├── packages/pdfoundation/  # ⭐ 共享语义核心 @andares/pdfoundation（parser/format/转换，主包与 pdeditor 共用）
+├── src/extension.ts     # VSCode 扩展（命令 + 格式化 + 回车/Tab 行为）
+├── src/tab.ts           # Tab 缩进逻辑（扩展专用）
+├── src/enter.ts         # 回车清子项标记（扩展专用）
+├── src/version.ts       # CLI 通用 --version
+├── packages/pdfoundation/  # ⭐ 共享语义核心 @andares/pdfoundation（parser/format/转换 + 语义测试与 fixtures）
 ├── packages/editor/     # headless 输入框组件 @andares/pdeditor
 ├── syntaxes/            # TextMate 语法高亮
 ├── docs/SPEC.md         # ⭐ 语法规范（唯一事实来源）
 ├── skill/               # AI skill（容器：promptdown/ 解析版 + pd-author/ 作者版）
-└── test/fixtures/       # 测试基准（含全部用户范例）
+└── test/                # 主包测试（CLI 集成 / tab 行为）
 ```
 
 ## 📄 License

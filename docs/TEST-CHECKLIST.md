@@ -3,7 +3,7 @@
 > 面向：一次含 **共享语义包迁移（@andares/pdfoundation）+ editor 语义导出 + 扩展 esbuild 打包** 的版本发布。
 > 自动门禁（typecheck/test/build/VSIX 内容）已覆盖的部分仍建议人工冒烟确认，尤其是标 ⚠️ 的**本轮真正改动的路径**。
 >
-> 测前基线：`pnpm typecheck && pnpm test`（主包 20）·`pnpm --filter @andares/pdfoundation test`（173）·`pnpm --filter @andares/pdeditor test`（53）全部通过。
+> 测前基线：`pnpm typecheck && pnpm test`（主包 26）·`pnpm --filter @andares/pdfoundation test`（178）·`pnpm --filter @andares/pdeditor test`（53）全部通过。
 
 ---
 
@@ -36,14 +36,14 @@
 - [ ] `npm pack --dry-run`（主包）→ 清单：**不含 packages/**、不含 node_modules、含 dist + skill ✅
 - [ ] **唯一主包发布入口**：`pnpm release-all patch` → 顺序固定 foundation（同号）→ 主包 → push/tag → vsce；editor 单独 `pnpm release-editor`（前置：foundation 目标版本已在 npm，否则消费方 ETARGET）；误敲 `pnpm release` 应被拦截提示
 - [ ] 临时目录 `npm i @andares/pdfoundation` → `import { format, pdToJsonText, jsonToPdText, compilePdText, splitInlineCode }` 全部可用且行为正确
-- [ ] 临时 vite 项目 `npm i @andares/pdeditor @andares/pdfoundation` → 引 `/pd` 入口，`vite build` 验证：产物**无 Prism**、语义可 tree-shake、能跑
+- [ ] 临时 vite 项目 `npm i @andares/pdeditor`（仅此一个包——foundation 作为 dependencies 应被自动带上，验证 node_modules 里存在 `@andares/pdfoundation`）→ 引 `/pd` 入口，`vite build` 验证：产物**无 Prism**、语义可 tree-shake、能跑
 - [ ] **主包回滚预案**：发布失败 → `git tag -d vX.Y.Z && git reset --hard HEAD~1`
 
 ---
 
 ## 3. editor 层（@andares/pdeditor）
 
-> ⚠️ 双入口 re-export `format / jsonToPdText / pdToJsonText`（+ 自研 `highlightPd`），**external + peer** `@andares/pdfoundation`，产物零体积、不内联。
+> ⚠️ 双入口 re-export `format / jsonToPdText / pdToJsonText`（+ 自研 `highlightPd`），**external + dependencies** `@andares/pdfoundation`，产物零体积、不内联（依赖由消费方 npm 自动安装）。
 
 - [ ] `pnpm --filter @andares/pdeditor build:editor`（lib 双入口 + demo 重建）无报错
 - [ ] `pnpm --filter @andares/pdeditor test`（53 用例，含 bundle-guard：pd 入口仅豁免 `@andares/pdfoundation` 一个 bare import）
@@ -53,7 +53,7 @@
   node -e "const m=require('./packages/editor/dist/pd.cjs'); \
     ['createPdEditor','highlightPd','format','pdToJsonText','jsonToPdText']\
     .forEach(k=>console.log(k, typeof m[k]))"
-  # 五项全为 function；format('任务：x')→'任务: x' 说明 peer 语义已解析
+  # 五项全为 function；format('任务：x')→'任务: x' 说明语义包已解析
   ```
 - [ ] 打开 `demo-dist/index.html`（file:// 直接开）：
   - 格式化按钮：全角冒号 → 半角、`已是最佳格式` 幂等提示
@@ -91,11 +91,7 @@
 ## 6. 收尾 / 提交
 
 - [ ] `git status` 复核：应无意外文件（vsix/tgz/generated 均 gitignored）
-- [ ] 提交建议（可分 4 笔，conventional commits）：
-  1. `feat: 共享语义包 @andares/pdfoundation（parser/format/转换，主包与 pdeditor 共用）`
-  2. `refactor: 主包壳层依赖共享语义包 + 扩展 esbuild 自包含打包`
-  3. `feat: editor 双入口 re-export 语义 API（external + peer）`
-  4. `docs: 多端架构/发布流程/TEST-CHECKLIST 同步`
+- [ ] 提交纪律：功能/修复提交时同步把条目写入 `CHANGELOG.dev.md`（见 AGENTS「变更日志约定」；editor 写 `packages/editor/CHANGELOG.dev.md`）；commit 用 conventional commits
 - [ ] 历史遗留：根目录 `promptdown-0.0.0-test.vsix` / `0.7.0` / `0.8.0` 已 gitignored，可顺手 `rm` 清理
 
 ---
@@ -107,5 +103,5 @@
 | VSIX 安装后激活报错 / 命令消失 | 扩展 bundle 断链（§1） |
 | 装了 VSIX 但 `PD格式转换` 说找不到模块 | dist 未自包含（§1/§2） |
 | npm 装主包后 CLI 报 `Cannot find module '@andares/pdfoundation'` | 发布顺序错 / 主包 tarball 缺 deps（§2） |
-| editor 消费端 import 语义函数 undefined | peer 未装 / 产物被误内联（§3） |
+| editor 消费端 import 语义函数 undefined | foundation 未自动安装（dependencies）/ 产物被误内联（§3） |
 | `pnpm perf` 报模块解析错误 | perf import 未跟随迁移（§4） |

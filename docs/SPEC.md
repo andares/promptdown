@@ -293,7 +293,7 @@ pdformat <file.pd> [-w|--write]
 
 ## 8. 格式化（pdformat / VSCode 格式化程序）
 
-格式化规则（`src/format.ts` 与 VSCode `DocumentFormattingEditProvider` 共用同一实现）：
+格式化规则（`packages/pdfoundation/src/format.ts` 与 VSCode `DocumentFormattingEditProvider` 共用同一实现）：
 
 1. **普通冒号标记优先**：行内只要有 `:-` 或 `：-`，整行不格式化为键值；这两个字符保持原样。后续合法引用仍可使用。
 2. **首个全角冒号**：若它之前没有出现半角冒号，且左侧能形成键名，则不论两侧有没有空格，都转成 `:`。例如 `name：value`、`name ：value`、`name ： value` 均转成 `name: value`。
