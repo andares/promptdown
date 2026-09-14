@@ -16,7 +16,7 @@
  *   sync（未提交 → git add -A + commit；本地领先 → push；落后 → 中止）→
  *   门禁（typecheck + test + build，含 foundation）→
  *   bump 主包 version + 同步 bump foundation version（同号）→
- *   CHANGELOG 归档（CHANGELOG.dev.md 开发期条目 → CHANGELOG.md 顶部 "## vX.Y.Z"，删 dev 文件；无则提示跳过）→
+ *   CHANGELOG 归档（CHANGELOG.dev.md 开发期条目 → CHANGELOG.md 顶部 "## X.Y.Z (YYYY-MM-DD)"，删 dev 文件；无则提示跳过）→
  *   commit + tag → 发 foundation → 发主包 →
  *   git push 分支 + tag → GitHub Release（best-effort）→ vsce package + publish（失败降级只发 npm）。
  *
@@ -184,7 +184,7 @@ if (dryRun) {
 		`  2. bump 主包 package.json version → ${next} + 同步 bump packages/pdfoundation version → ${next}（同号绑定）`,
 	);
 	console.log(
-		`  2.5 CHANGELOG.dev.md 存在且有内容 → 归档为 CHANGELOG.md 顶部 "## v${next}" 章节（无则提示跳过）`,
+		`  2.5 CHANGELOG.dev.md 存在且有内容 → 归档为 CHANGELOG.md 顶部 "## ${next} (YYYY-MM-DD)" 章节（无则提示跳过）`,
 	);
 	if (tagExists(`v${next}`)) {
 		const tagCommit = run(
@@ -355,7 +355,7 @@ writeFileSync(
 
 // 2.5 CHANGELOG 归档：开发期条目（CHANGELOG.dev.md）→ CHANGELOG.md 顶部新版本章节。
 //     版本号发布时才确定，开发期不预写；dev 文件归档后删除，随 release commit 一起进 git。
-step(`CHANGELOG.dev.md → CHANGELOG.md 顶部 "## v${next}"（归档开发期条目）`);
+step(`CHANGELOG.dev.md → CHANGELOG.md 顶部 "## ${next} (日期)"（归档开发期条目）`);
 let changedFiles = ["package.json", FOUNDATION_PKG_PATH];
 if (existsSync(DEV_CHANGELOG_PATH)) {
 	const devRaw = readFileSync(DEV_CHANGELOG_PATH, "utf8");
@@ -380,19 +380,22 @@ if (existsSync(DEV_CHANGELOG_PATH)) {
 			);
 			process.exit(1);
 		}
-		const section = `## v${next}\n\n${entries}\n`;
-		const insertAt = idx + heading.length;
+		const now = new Date();
+		const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+		// 插到首个已有 "## " 版本章节之前（最新在前）；无已有章节时退回标题锚行之后。
+		const firstSection = changelog.indexOf("\n## ");
+		const insertAt =
+			firstSection !== -1 ? firstSection + 1 : idx + heading.length + 1;
+		const section = `## ${next} (${today})\n\n${entries}\n\n`;
 		writeFileSync(
 			CHANGELOG_PATH,
-			changelog.slice(0, insertAt) +
-				`\n${section}` +
-				changelog.slice(insertAt),
+			changelog.slice(0, insertAt) + section + changelog.slice(insertAt),
 			"utf8",
 		);
 		rmSync(DEV_CHANGELOG_PATH);
 		changedFiles = [...changedFiles, "CHANGELOG.md", "CHANGELOG.dev.md"];
 		console.log(
-			`${C.green}已归档 ${entries.split("\n").filter((l) => l.startsWith("- ")).length} 条到 "## v${next}"${C.reset}`,
+			`${C.green}已归档 ${entries.split("\n").filter((l) => l.startsWith("- ")).length} 条到 "## ${next} (${today})"${C.reset}`,
 		);
 	}
 } else {

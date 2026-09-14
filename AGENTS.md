@@ -34,7 +34,7 @@
 | `node dist/compile-cli.js <section> <file>...` | 多段编译为单份完整 pd（发布后为 `pdcompile`；跨文件合并段列表、引用内联展开、统一 format） |
 | `pnpm exec vsce package` | 生成 .vsix（或 `pnpm package`） |
 | `pnpm release-all <patch\|minor\|major>` | **唯一主包发布入口**：foundation（版本与主包同号）+ 主包 npm + push + GitHub Release + vsce；顺序固定 foundation→主包；npm 失败中止；vsce 失败降级为只发 npm |
-| `pnpm release-editor <patch\|minor\|major>` | 发布组件包 `@andares/pdeditor`（packages/editor）：**纯 npm 流程**——组件门禁（typecheck+test+build）→ bump → pnpm publish；**前置：@andares/pdfoundation 须已在 npm**（peer `workspace:^` 发布时改写为本地 foundation 版本，若该版本未上 npm，消费方安装会 ETARGET）；**无任何 git 操作**（不 commit / tag / push / GitHub Release——editor 独立版本号，不进仓库 git 历史与 tag；bump 留在工作区由使用者自行提交；`--dry-run` 预览） |
+| `pnpm release-editor <patch\|minor\|major>` | 发布组件包 `@andares/pdeditor`（packages/editor）：**纯 npm 流程**——组件门禁（typecheck+test+build）→ bump → **CHANGELOG 归档**（`packages/editor/CHANGELOG.dev.md` → `CHANGELOG.md` 最新章节）→ pnpm publish；**前置：foundation 目标版本须已在 npm**（dependencies `workspace:^` 发布时改写为本地 foundation 版本，未上 npm 则消费方 ETARGET）；**无任何 git 操作**（bump 与归档留在工作区由使用者自行提交；`--dry-run` 预览） |
 | ~~`pnpm release`~~ / ~~`pnpm release-foundation`~~ | 已移除（并入 release-all）：主包与 foundation 同号强绑定，独立 npm 发布不再单独提供；误敲会被拦截提示改用 release-all / release-editor |
 | `pnpm tag-current` | 给当前版本打本地 tag `vX.Y.Z`（已存在则跳过，不推送） |
 
@@ -99,30 +99,31 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 2. **sync**：未提交改动 → 展示清单 + `git add -A` + commit `chore: sync uncommitted changes before release`；本地领先远端 → `git push origin <分支>`（失败中止）；本地落后远端 → 中止（提示 `git pull --rebase`）；都没有 → 跳过不推。保证 release commit 与 tag 建立在线上最新代码上，不会出现“文件没提交但 tag 已打”
 3. 门禁：typecheck + test + build（含 foundation 的 test），失败即中止
 4. bump 主包 `package.json` version + **同步 bump `packages/pdfoundation/package.json` version（同号）**（2 空格缩进 + 尾换行）
-5. **CHANGELOG 归档**：`CHANGELOG.dev.md`（开发期变更日志，见下节）存在且有条目 → 条目归档为 `CHANGELOG.md` 顶部 `## vX.Y.Z` 章节（锚 `# Changelog` 标题行后插入），删除 dev 文件，两者随 release commit 进 git；文件不存在或无条目 → 黄字提示跳过（纯依赖/内部提交可无记录）；`CHANGELOG.md` 缺锚点 → 红字中止
+5. **CHANGELOG 归档**：`CHANGELOG.dev.md`（开发期变更日志，见下节）存在且有条目 → 条目归档为 `CHANGELOG.md` 顶部 `## X.Y.Z (YYYY-MM-DD)` 章节（插到最新章节之前；无已有章节时锚 `# Changelog` 标题行），删除 dev 文件，两者随 release commit 进 git；文件不存在或无条目 → 黄字提示跳过（纯依赖/内部提交可无记录）；`CHANGELOG.md` 缺标题锚点 → 红字中止
 6. `git commit -m "chore: release vX.Y.Z"`，然后调用 `scripts/tag-current.mjs` 打 tag（检测已存在 → 不重复打，指向 release commit）
 7. `pnpm --filter @andares/pdfoundation publish --no-git-checks --access=public`（foundation 先发）→ `pnpm publish --no-git-checks --access=public`（主包，prepublishOnly 再次门禁；任一处失败中止，回滚见下）
 8. `git push origin <当前分支> refs/tags/vX.Y.Z`（只推该 tag 非全量 --tags；尝试一次，失败仅警告——可能此前已推过）
 9. 设了 `GITHUB_TOKEN`（fine-grained，Contents: write）且 tag 已到远端（`git ls-remote` 验证，push 失败时跳过避免 Release 指向错误 commit），就用 curl 调 REST API 创建 GitHub Release `vX.Y.Z`（`generate_release_notes` 自动生成 notes；422 `already_exists` → 跳过；其他失败 → 仅警告）
 10. `pnpm exec vsce package` 生成 `promptdown-<version>.vsix`；若设了 `VSCE_PAT`（vsce 官方环境变量）或 `~/.vsce` 里有 publisher 凭据，自动 `vsce publish`；否则提示手动补发
 
-## 变更日志约定（CHANGELOG.dev.md → CHANGELOG.md）
-
-**版本号是发布时才确定的，不是发布前加上去的**——开发期绝不知道下一个版本号是什么，因此**禁止在 CHANGELOG.md 里预写 `## X.Y.Z (未发布)` 章节**（历史上 0.7–0.10 的 "(未发布)" 标记是旧方案遗留，勿模仿）。规则：
-
-- **开发期**：agent/人在功能或修复提交时，把变更条目追加到根目录 **`CHANGELOG.dev.md`**（临时文件，文件头自带用途说明；不存在则按该头模板新建）。条目格式与 CHANGELOG.md 一致（`- **要点**：说明`，可带缩进子条目），**不写版本号**。每次提交把对应条目一并写好，不留到发布前补
-- **发布时（release-all 第 5 步，agent 不执行——发布由用户本人跑）**：脚本自动把 `CHANGELOG.dev.md` 的条目（滤掉标题/引用说明行）归档为 `CHANGELOG.md` 顶部 `## vX.Y.Z` 章节（X.Y.Z = 本次 bump 出的版本），随后删除 dev 文件；两者进 release commit
-- **无条目发布**：dev 文件缺失或只有说明 → 提示跳过，不阻塞（纯依赖/内部提交）
-- **release-editor 不处理变更日志**（editor 独立版本号，变更记录在 `packages/editor/CHANGELOG.md` 自行维护，不走 dev 归档）
-
-`pnpm tag-current` 可独立使用：给当前 HEAD 打本地 `v{version}` tag（已存在则跳过），**只打 tag 不推送**。
+### 附注（发布相关约定）
 
 **npm 包名与仓库名不同**：npm registry 上 `promptdown` 已被他人占用（相似度保护会拒绝近似名），
 发布 npm 用 `package.json` 的 **`publishConfig.name`** 声明 scoped 名 **`@andares/promptdown`**（`--access=public`），
 脚本不再临时改包名；`package.json` 的 `name` 保持 `promptdown`（vsce 需要非 scoped 名，扩展 ID 为 `andares.promptdown`）。
 安装命令：`npm install -g @andares/promptdown`。
 
-发布失败回滚：`git tag -d vX.Y.Z && git reset --hard HEAD~1`——注意若 foundation 已发布则无法撤回（npm 不支持删版本），重跑将 bump 至下一版本、foundation 跳号跟随（无害）
+**发布失败回滚**：`git tag -d vX.Y.Z && git reset --hard HEAD~1`——注意若 foundation 已发布则无法撤回（npm 不支持删版本），重跑将 bump 至下一版本、foundation 跳号跟随（无害）。
+
+## 变更日志约定（唯一变更留档：CHANGELOG.dev.md → CHANGELOG.md）
+
+本项目**不另设 implementation-report 等留档**——变更记录的唯一载体是 CHANGELOG（发布时归档）；计划/方案文件为一次性产物（见 Conventions）。**版本号发布时才确定**——开发期禁止在 CHANGELOG.md 预写 `## X.Y.Z (未发布)` 章节（历史上 0.7–0.10 的 "(未发布)" 标记是旧方案遗留，勿模仿；已于 2026-09 清理）。
+
+**章节格式统一为 `## X.Y.Z (YYYY-MM-DD)`**（无 `v` 前缀；日期 = 发布日，归档脚本自动写入）。
+
+- **开发期（主包 + foundation）**：功能/修复提交时把条目追加到根目录 **`CHANGELOG.dev.md`**（临时文件，文件头自带用途说明；不存在则按该头模板新建）。格式 `- **要点**：说明`（可带缩进子条目），**不写版本号**；每次提交一并写好，不留到发布前补
+- **发布时（release-all 第 5 步，agent 不执行——发布由用户本人跑）**：脚本把 dev 条目（滤掉标题/引用说明行）归档为 `CHANGELOG.md` 顶部 `## X.Y.Z (发布日期)` 章节，删除 dev 文件，随 release commit 进 git；无条目/文件缺失 → 提示跳过，不阻塞（纯依赖/内部提交）
+- **editor（独立版本线）**：同一纪律，文件在包内——开发期条目写 **`packages/editor/CHANGELOG.dev.md`**；`pnpm release-editor` 在 bump 后归档为 `packages/editor/CHANGELOG.md` 最新章节（最新在前）并删除 dev 文件（改动留工作区，无 git 操作）
 
 ## 共享语义核心（@andares/pdfoundation）
 
@@ -130,13 +131,13 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 
 - **内容**：parser（lexer/parser/toJson/expand/types）+ format + pdtransform + jsonToPd + auto-detect——主包（VSCode 扩展 + CLI）与 `@andares/pdeditor`（pd 入口语义 re-export）**共同依赖**，语义单一来源，消除跨包漂移
 - **构建**：vite lib ESM/CJS 双格式（index.js / index.cjs）+ tsc d.ts；`sideEffects:false` 可树摇；零依赖（无需 external）
-- **消费**：主包用 CJS `require`（`moduleResolution: node` 靠顶层 `main`/`types` 兜底解析，非 exports）；Web 端经 editor pd 入口 re-export（external + peer）或直接 import
+- **消费**：主包用 CJS `require`（`moduleResolution: node` 靠顶层 `main`/`types` 兜底解析，非 exports）；Web 端经 editor 双入口 re-export（vite external + **dependencies**）或直接 import
 - **发布**：随主包 release-all 一起发——版本号与主包**同号绑定**（publish.mjs bump 时同步写入），顺序固定：先发 foundation 再发主包；主包 dependencies 用 `workspace:^`，pnpm 发布时自动改写为实际版本
-- **测试**：语义测试随包（tsx --test + fixtures，173 用例）；CLI 集成测试（spawn compile-cli）留在主包 test/
+- **测试**：语义测试随包（tsx --test + fixtures，178 用例）；CLI 集成测试（spawn compile-cli）留在主包 test/
 
 ## Web 输入框组件（@andares/pdeditor，headless 优先）
 
-### 当前目标（已实现 v0.1，见 packages/editor/）
+### 当前状态（v0.4.x，见 packages/editor/）
 
 基于 **Yace**（<https://github.com/petersolopov/yace，~2KB、零依赖、BYO> highlighter）的 **headless 提示词输入框** `@andares/pdeditor`：
 
@@ -144,9 +145,10 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 - **语言切换是 API 行为**（非 UI 切换器）：pd / md / xml / json / yaml（Prism 提供后四种）
 - **不是富文本**：pd 是纯代码文本，要精确不要样式——高亮服务于精确；排除富文本引擎（ProseMirror/Lexical/Slate）与 CM6/Monaco 本体
 - **不依赖主包**（主包 = VSCode 扩展，main 指向 dist/extension.js，浏览器不可 import）：pd 高亮 tokenizer 仍在组件内自研（语义与共享包 lexer 一致，见 `packages/editor/src/inline.ts`）；语义功能改走**共享语义包 @andares/pdfoundation**（见上节），不再直引主包源码
-- **语义 API：pd 入口 re-export @andares/pdfoundation**：`format` / `jsonToPdText` / `pdToJsonText`(external + peerDependency `@andares/pdfoundation`，产物零体积、零漂移——语义单一来源)；`highlightPd` 也随 pd 入口导出（自研 tokenizer，供外部自定义渲染/复用）
+- **语义 API：双入口 re-export @andares/pdfoundation**：两个入口均导出 `format` / `jsonToPdText` / `pdToJsonText`；`/pd` 入口另含自研 `highlightPd`（供外部自定义渲染/复用）。pdfoundation 声明在 **dependencies**（产物直接外部 import 的运行时依赖必须自动安装；vite external 不内联、零产物体积）——**勿改回 peerDependencies**（peer 仅用于真正需要宿主注入/共享实例的包）
 - **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 测试 53 用例）
-- **demo 页**：`packages/editor/demo/`（vite dev 验证高亮/语言切换/中文 IME/格式化/双向转换——demo 从共享包引语义，演示 external+peer 消费姿势；`test/demo-smoke.test.ts` 防回归）
+- **demo 页**：`packages/editor/demo/`（vite dev 验证高亮/语言切换/中文 IME/格式化/双向转换——demo 从共享包引语义，演示消费方接入姿势；`test/demo-smoke.test.ts` 防回归）
+- **变更记录**：`packages/editor/CHANGELOG.md`（独立版本线；开发期条目写 `packages/editor/CHANGELOG.dev.md`，`pnpm release-editor` 自动归档）
 - 插件（yace 内置）：Tab 缩进 + 续行缩进默认启用
 
 ### 未来可选方向（不在本期实现）
@@ -166,11 +168,11 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 
 - 内联 markdown（`**粗体**`、`` `代码` ``）转 JSON 时**保留原文**，不做内联解析
 - 数组元素一行一个，无逗号分隔
-- 测试用 node:test + fixtures（`test/fixtures/*.pd`），新增语法规则必须补 fixtures + 断言
+- 测试：语义用例随共享包（`packages/pdfoundation/test/`，node:test + fixtures）；主包 `test/` 为 CLI 集成与编辑器行为用例；editor 为 vitest + jsdom。新增语法规则必须补 fixtures + 断言
 - 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/promptdown/SKILL.md` → fixtures
-- 格式化规则（src/format.ts）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
+- 格式化规则（`packages/pdfoundation/src/format.ts`）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
 - **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
-- 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release` / `pnpm release-all`
+- 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release-all` / `pnpm release-editor`
 - **editor 功能改动后必须重建 demo**：`packages/editor/` 的 `src/` 或 `demo/` 有任何改动后，必须重新构建预构建 demo——`pnpm --filter @andares/pdeditor build:demo`（或一步到位 `build:editor` = lib build + demo build），保证 `demo-dist/` 与源码同步（demo-dist 是本地产物，gitignored 不入库，但用户直接打开它查看效果，旧产物会误导）
 - `.npmignore` 控制发布内容（pnpm 复用 npm 的发布文件机制，勿删）；新增发布文件记得检查它
 - **计划/方案文件为一次性任务产物**：完成后删除，不留仓库根目录（完整过程轨迹保留在 git 历史与 commit message）；需要常驻的设计文档放 `docs/`
