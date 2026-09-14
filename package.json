@@ -2,7 +2,7 @@
   "name": "promptdown",
   "displayName": "promptdown",
   "description": "极简标记语言 promptdown（.pd）：兼容 markdown 风格，可双向转换 JSON、编译多段、格式化；VSCode 扩展 + pdtransform/pdcompile/pdformat CLI（语义核心 @andares/pdfoundation，API 自 1.0 起冻结）",
-  "version": "0.10.0",
+  "version": "1.0.0",
   "publisher": "andares",
   "license": "MIT",
   "dependencies": {
