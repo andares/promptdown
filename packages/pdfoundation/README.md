@@ -2,7 +2,7 @@
 
 [promptdown](https://github.com/andares/promptdown)（`.pd` 极简标记语言）的**共享语义核心**——解析 / 格式化 / 双向转换，零运行时依赖，Node 与 Web 通用。
 
-主包 [`@andares/promptdown`](https://www.npmjs.com/package/@andares/promptdown)（VSCode 扩展 + CLI）与 [`@andares/pdeditor`](https://www.npmjs.com/package/@andares/pdeditor)（headless 输入框组件）共同依赖本包，保证语义单一来源、零漂移。语法规范见 [docs/SPEC.md](https://github.com/andares/promptdown/blob/master/docs/SPEC.md)（唯一事实来源）。
+主包 [`@andares/promptdown`](https://www.npmjs.com/package/@andares/promptdown)（VSCode 扩展 + CLI）与 [`@andares/pdeditor`](https://www.npmjs.com/package/@andares/pdeditor)（低 UI 输入框：工厂 + `<pd-editor>` + React 包装）共同依赖本包，保证语义单一来源、零漂移。语法规范见 [docs/SPEC.md](https://github.com/andares/promptdown/blob/master/docs/SPEC.md)（唯一事实来源）。
 
 ## 安装
 

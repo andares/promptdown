@@ -14,7 +14,7 @@
 		"resolveJsonModule": true,
 		"declaration": true,
 		"declarationDir": "dist",
-		"declarationMap": true
+		"declarationMap": false
 	},
 	"include": ["src"],
 	"exclude": ["node_modules", "dist", "test"]

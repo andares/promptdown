@@ -11,7 +11,7 @@ export default defineConfig({
 			formats: ["es", "cjs"],
 			fileName: (format) => (format === "es" ? "index.js" : "index.cjs"),
 		},
-		sourcemap: true,
-		emptyOutDir: true,
+		sourcemap: false,
+		emptyOutDir: false,
 	},
 });
