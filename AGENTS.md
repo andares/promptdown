@@ -148,6 +148,7 @@ packages/editor/            # 低 UI 输入框 @andares/pdeditor（工厂 + <pd-
 - **语义单源**：pd tokenizer 在组件内（`pd-highlight.ts`），行内判定直接复用 foundation 导出（`splitInlineCode` / `matchKeyValue` / `findKeyValueSeparator`），不再保留副本
 - **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 82 用例）；`foundation` 在 dependencies（external + 自动安装）
 - **demo**：`demo/index.html` + `demo/app.ts`；`pnpm --filter @andares/pdeditor build:demo` 用 esbuild 产出**单文件** `demo-dist/index.html`（file:// 双击可用，内联 IIFE；含低 UI 嵌入示例、基础工具栏 UI、框架用法、浏览器几何自检）；`dev` 仍用 vite 热更新
+- **集成指南（给其他 agent）**：`skill/pdeditor/SKILL.md`——选入口 / 各框架可复制代码 / 低 UI 嵌入契约 / 禁止事项 / 集成后自测清单。**其他 agent 要把输入框嵌进别的项目时，先读它**（本会话/后续会话都适用，不要重新推导一遍）。它随 npm 包 `@andares/promptdown` 发布（`skill/` 目录），本机软链即可被自动发现
 - **变更记录**：`packages/editor/CHANGELOG.md`（独立版本线；开发期条目写 `packages/editor/CHANGELOG.dev.md`，`pnpm release-editor` 自动归档）
 
 ### 未来可选方向

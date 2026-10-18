@@ -386,7 +386,7 @@ promptdown 由三个 npm 包组成，1.0 后以下公共面**冻结**（不可�
 
 ## 🤖 AI Skill
 
-两个 skill，按需安装：
+三个 skill，按需安装：
 
 **① 解析版 [`skill/promptdown/SKILL.md`](skill/promptdown/SKILL.md)** —— 提供 pd 语法知识（读）：
 
@@ -399,7 +399,15 @@ promptdown 由三个 npm 包组成，1.0 后以下公共面**冻结**（不可�
 - 含通用 prompt 骨架模板、领域范例、作者视角避坑清单
 - 触发词：写提示词、组织提示词、提示词结构、用 pd 写
 
-安装到 AI 的 skill 目录即可（如 `~/.pi/agent/skills/` 或项目 `.agents/skills/`，`pd-author/` 目录整体复制为独立 skill）。
+**③ 集成版 [`skill/pdeditor/SKILL.md`](skill/pdeditor/SKILL.md)** —— 教 AI **把输入框嵌进别的项目**（`@andares/pdeditor`）：
+
+- 选入口（React / element / pd-only / 全量）、装依赖、三种用法可复制代码
+- React / Preact / Solid / Vue / Svelte / 原生 的绑定姿势（含 React 18 自定义元素坑、Vue 需 `isCustomElement`）
+- 低 UI 嵌入契约（高度、字体继承、CSS 变量主题、shadow/light）、事件与 API 速查、禁止事项、集成后自测清单
+- 触发词：集成 pdeditor、嵌入输入框、提示词输入框、`<pd-editor>`
+
+安装到 AI 的 skill 目录即可（如 `~/.pi/agent/skills/` 或项目 `.agents/skills/`；整个 `skill/` 目录软链/复制即可——三个 skill 各自独立）。
+`skill/` 随 npm 包 `@andares/promptdown` 发布，因此装过全局包的话，本机只需软链到包的 `skill/`（`~/.pi/agent/skills/promptdown → <npm 全局包>/skill`），三个 skill 一起自动发现。
 
 ## 🖥️ Web 输入框组件
 

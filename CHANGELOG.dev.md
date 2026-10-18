@@ -13,3 +13,6 @@
 - **仓库清理**：删除已完成的 `plans/*.md`（一次性产物，过程保留在 git 历史）；`.pi-lens.json` 禁用 Deno LSP（本仓库是 Node/pnpm 项目，避免 npm 包类型解析的误报）。
 - **发布流程**：`release-editor` 在 bump 之前增加 foundation 目标版本的 npm 预检（未上 npm 直接中止，避免消费方 ETARGET 与“已 bump 未发布”的半成品）；`release-all` 计划文案与实际门禁对齐。
 - **评审修复**：`<pd-editor>` 的 `maxLength` 负数/NaN 时不写入 maxlength（避免 IndexSizeError，JS property 与 maxlength 属性语义分离）。
+- **AI 集成指南（新）**：新增 skill `skill/pdeditor/SKILL.md`（`pdeditor-integration`）——给其他 agent 用的集成手册：选入口表、各框架可复制代码（React/Preact/Solid/Vue/Svelte/原生，含 React 18 自定义元素字符串化、Vue 需 `isCustomElement`）、低 UI 嵌入契约（高度/字体继承/CSS 变量主题/shadow-light）、事件与 API 速查、7 条禁止事项、集成后三步自测。随 npm 包发布（`skill/`），本机软链即可被自动发现；根 README「AI Skill」章节由两个 skill 更新为三个。
+- **修复（发布内容）**：`.npmignore` 不再整体排除 `docs/`——`skill/promptdown` 与 `skill/pd-author` 里有 `../../docs/SPEC.md` 相对引用，agent 装包后靠它读唯一事实来源；改为逐文件排除内部文档（ROADMAP/TEST-CHECKLIST），SPEC/TUTORIAL 随包发布。
+- **文档指针**：editor README 顶部与 AGENTS.md 组件章节补「其他 agent 集成先读 `skill/pdeditor/SKILL.md`」。

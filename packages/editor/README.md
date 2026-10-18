@@ -12,6 +12,11 @@
 
 支持格式：`pd`（内置 tokenizer，语义与 `@andares/pdfoundation` lexer 一致）/ `md` / `xml` / `json` / `yaml`（Prism，主入口内置）。
 
+> 🤖 **AI agent 集成本项目时**：先读 [`skill/pdeditor/SKILL.md`](https://github.com/andares/promptdown/blob/master/skill/pdeditor/SKILL.md)
+> （选入口 / 各框架可复制代码 / 低 UI 嵌入契约 / 禁止事项 / 集成后自测清单），
+> 该 skill 随 npm 包 `@andares/promptdown` 发布，装过全局包即可被 agent 自动发现。
+> 本文档是完整的 API/主题/浏览器支持手册。
+
 ---
 
 ## 安装

@@ -13,7 +13,11 @@ tmp/
 .gitleaks.toml
 AGENTS.md
 CHANGELOG.dev.md
-docs/
+# docs/ 只排除内部文档：SPEC.md 与 TUTORIAL.md 必须随包发布——
+# skill/promptdown 与 skill/pd-author 里有 `../../docs/SPEC.md` 相对引用，
+# agent 装包后靠它读唯一事实来源（npm 不支持“排除目录再补回子文件”，故逐文件排除）。
+docs/ROADMAP-1.0.md
+docs/TEST-CHECKLIST.md
 icons/concepts/
 PLAN.md
 plans/
