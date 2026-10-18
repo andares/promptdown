@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { highlightPd } from "../src/pd-highlight";
 import { matchKeyValue, hasLiteralColon, splitInlineCode } from "../src/inline";
 
-describe("inline.ts（行内代码/转义判定，与主包 lexer 语义一致）", () => {
+describe("行内判定（foundation re-export，与主包 lexer 同源）", () => {
 	it("反引号配对切分", () => {
 		expect(splitInlineCode("a `b` c")).toEqual([
 			{ code: false, seg: "a " },

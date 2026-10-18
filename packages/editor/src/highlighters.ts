@@ -7,7 +7,7 @@ import "prismjs/components/prism-yaml";
 export type PrismLang = "markup" | "markdown" | "json" | "yaml";
 
 /**
- * Prism 高亮（md/xml/json/yaml）——Yace 管线第一级（html:false → 输出 HTML）。
+ * Prism 高亮（md/xml/json/yaml）——引擎高亮管线第一级（纯文本 → 输出 HTML）。
  * 需配套 CSS（prismjs/themes 或自定义 token 样式）。
  */
 export function highlightWithPrism(value: string, lang: PrismLang): string {

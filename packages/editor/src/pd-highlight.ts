@@ -6,7 +6,7 @@ import {
 } from "./inline";
 
 /**
- * pd 语法高亮：把 pd 文本转成带 class 的 HTML（Yace highlighter 管线第一级）。
+ * pd 语法高亮：把 pd 文本转成带 class 的 HTML（引擎高亮管线第一级）。
  * 语义与主包 TS 核心 lexer 一致（严格键值/`:-` 转义/行内代码豁免/围栏），
  * 输出 span class 与 TextMate scope 对应（pd-key/pd-item/pd-section/pd-sep/...）。
  *
@@ -14,7 +14,7 @@ import {
  * 本模块零依赖（自包含 tokenizer），组件不依赖主包。
  */
 
-/** HTML 转义（Yace 管线第一级要求：纯文本 → 转义 HTML） */
+/** HTML 转义（高亮管线第一级要求：纯文本 → 转义 HTML） */
 function esc(s: string): string {
 	return s
 		.replace(/&/g, "&amp;")
@@ -103,8 +103,9 @@ function highlightLine(raw: string): string {
 	if (trimmed === "---") {
 		return `<span class="${CLS.sep}">${esc(raw)}</span>`;
 	}
-	// item 判定：`-` 后跟空白或行尾（与 lexer 一致，`-x` 不是 item）
-	const itemM = /^(\s*)(-)(?=\s|$)/.exec(raw);
+	// item 判定：`-` 后跟空格或行尾（与 lexer 的 `text === "-" || startsWith("- ")` 一致；
+	// `-\t` 在核心是普通文本，这里不能比核心更宽松）
+	const itemM = /^(\s*)(-)(?=[ ]|$)/.exec(raw);
 	if (itemM) {
 		const indent = esc(itemM[1] ?? "");
 		const dashPos = (itemM[1] ?? "").length + 1; // `-` 之后的位置（含缩进）
@@ -142,7 +143,7 @@ function highlightLine(raw: string): string {
 }
 
 /**
- * pd 文本 → HTML（Yace highlighter）。围栏状态跟踪：围栏内行原样（仅转义）。
+ * pd 文本 → HTML。围栏状态跟踪：围栏内行原样（仅转义）。
  */
 export function highlightPd(value: string): string {
 	const lines = value.split("\n");

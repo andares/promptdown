@@ -12,7 +12,7 @@ export default defineConfig({
 			formats: ["es", "cjs"],
 			fileName: (format) => (format === "es" ? "pd.js" : "pd.cjs"),
 		},
-		sourcemap: true,
+		sourcemap: false,
 		emptyOutDir: false,
 		// 语义 re-export：@andares/pdfoundation 保持 external（不内联），
 		// 由消费方按 peerDependencies 提供——避免产物携带语义副本导致漂移。

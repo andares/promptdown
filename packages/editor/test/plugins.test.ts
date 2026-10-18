@@ -95,7 +95,7 @@ describe("pdTab（序列项行 Tab 整行缩进 / Shift+Tab 缩出）", () => {
 		expect(out.value).toBe("  - 甲\n  - 乙\n");
 	});
 
-	it("非序列项行 Tab → 插入缩进单位（Yace 默认行为）", () => {
+	it("非序列项行 Tab → 插入缩进单位（默认行为）", () => {
 		const plugin = pdTab("  ");
 		const r = plugin(props("name: value", 5), keyEvent("tab"));
 		const out = r as Props;

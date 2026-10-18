@@ -12,7 +12,7 @@ export default defineConfig({
 			formats: ["es", "cjs"],
 			fileName: (format) => (format === "es" ? "index.js" : "index.cjs"),
 		},
-		sourcemap: true,
+		sourcemap: false,
 		emptyOutDir: true,
 		// 语义 re-export：@andares/pdfoundation 保持 external（不内联），由消费方按 peer 提供
 		rollupOptions: {

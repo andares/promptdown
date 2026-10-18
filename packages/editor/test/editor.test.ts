@@ -28,7 +28,7 @@ describe("createPdEditor（headless API）", () => {
 		editor.destroy();
 	});
 
-	it("styles 从根节点统一传给 Yace", () => {
+	it("styles 应用到引擎根节点与覆盖层（不污染挂载点）", () => {
 		const el = document.createElement("div");
 		document.body.appendChild(el);
 		const editor = createPdEditor(el, {
@@ -40,12 +40,16 @@ describe("createPdEditor（headless API）", () => {
 			},
 		});
 
-		expect(el.style.fontSize).toBe("14px");
-		expect(el.style.lineHeight).toBe("20px");
-		expect(el.style.padding).toBe("12px");
-		expect(editor.textarea.style.fontSize).toBe("inherit");
-		expect(editor.textarea.style.lineHeight).toBe("inherit");
-		expect(editor.textarea.style.padding).toBe("inherit");
+		// 挂载点不被写入任何内联样式（低 UI：宿主布局归宿主）
+		expect(el.style.fontSize).toBe("");
+		expect(el.style.padding).toBe("");
+		const root = editor.root;
+		expect(root.style.fontSize).toBe("14px");
+		expect(root.style.lineHeight).toBe("20px");
+		// padding 应用到高亮层/输入层（而不是 root，否则绝对定位会被再偏移一次）
+		expect(editor.textarea.style.padding).toBe("12px");
+		expect(editor.pre.style.padding).toBe("12px");
+		expect(root.style.padding).toBe("");
 		editor.destroy();
 	});
 
@@ -121,7 +125,7 @@ describe("中文输入法组合期渲染", () => {
 		ta.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
 		ta.value = "任务: ni";
 		ta.setSelectionRange(4, 6);
-		// 组合期 input：真实浏览器事件带 isComposing=true（Yace 会跳过，组件监听器接管）
+		// 组合期 input：真实浏览器事件带 isComposing=true（引擎会跳过提交，组件监听器接管渲染）
 		const composingInput = new Event("input", { bubbles: true });
 		Object.defineProperty(composingInput, "isComposing", { value: true });
 		ta.dispatchEvent(composingInput);
@@ -352,5 +356,181 @@ describe("history 撤销 / 重做", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe("低 UI / 可嵌入契约", () => {
+	it("setValue 重置历史：程序化回填后撤销不跳回旧输入", () => {
+		vi.useFakeTimers();
+		try {
+			const el = document.createElement("div");
+			document.body.appendChild(el);
+			const editor = createPdEditor(el, { value: "hello" });
+			const ta = editor.textarea;
+			ta.value = "helloabc";
+			ta.dispatchEvent(new Event("input", { bubbles: true }));
+			vi.advanceTimersByTime(1000);
+			editor.setValue("PROGRAMMATIC");
+			const event = new KeyboardEvent("keydown", {
+				key: "z",
+				ctrlKey: true,
+				cancelable: true,
+			});
+			ta.dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(true);
+			expect(editor.getValue()).toBe("PROGRAMMATIC");
+			editor.destroy();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("撤销栈为空也吃掉 Ctrl+Z（不落到浏览器原生撤销）", () => {
+		const { editor } = mount("hello");
+		const event = new KeyboardEvent("keydown", {
+			key: "z",
+			ctrlKey: true,
+			cancelable: true,
+		});
+		editor.textarea.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(true);
+		expect(editor.getValue()).toBe("hello");
+		editor.destroy();
+	});
+
+	it("CRLF 归一化：getValue 与 textarea.value 一致", () => {
+		const { editor } = mount("");
+		editor.setValue("a: 1\r\nb: 2");
+		expect(editor.getValue()).toBe("a: 1\nb: 2");
+		expect(editor.textarea.value).toBe("a: 1\nb: 2");
+		editor.destroy();
+	});
+
+	it("placeholder 覆盖层 + aria-placeholder；有值时隐藏", () => {
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+		const editor = createPdEditor(el, {
+			value: "",
+			placeholder: "请输入提示词",
+		});
+		const ph = el.querySelector<HTMLElement>(".pd-placeholder")!;
+		expect(ph.textContent).toBe("请输入提示词");
+		expect(ph.style.display).toBe("block");
+		expect(editor.textarea.getAttribute("aria-placeholder")).toBe("请输入提示词");
+		editor.setValue("x");
+		expect(ph.style.display).toBe("none");
+		editor.destroy();
+	});
+
+	it("覆盖层/占位符 aria-hidden（读屏只读到 textarea）", () => {
+		const { el, editor } = mount("a: 1");
+		expect(el.querySelector("pre")!.getAttribute("aria-hidden")).toBe("true");
+		expect(
+			el.querySelector(".pd-placeholder")!.getAttribute("aria-hidden"),
+		).toBe("true");
+		editor.destroy();
+	});
+
+	it("readOnly / disabled / maxLength / spellcheck 选项", () => {
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+		const editor = createPdEditor(el, {
+			value: "123456",
+			readOnly: true,
+			maxLength: 4,
+			spellcheck: true,
+		});
+		expect(editor.textarea.readOnly).toBe(true);
+		expect(editor.textarea.getAttribute("aria-readonly")).toBe("true");
+		expect(editor.textarea.maxLength).toBe(4);
+		expect(editor.textarea.spellcheck).toBe(true);
+		editor.setValue("123456");
+		expect(editor.getValue()).toBe("1234");
+		editor.destroy();
+	});
+
+	it("insertText / getSelection / setSelection", () => {
+		let last = "";
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+		const editor = createPdEditor(el, {
+			value: "hello",
+			onValueChange: (v) => {
+				last = v;
+			},
+		});
+		editor.setSelection(0, 0);
+		editor.insertText("X");
+		expect(editor.getValue()).toBe("Xhello");
+		expect(editor.getSelection()).toEqual({ start: 1, end: 1 });
+		expect(last).toBe("Xhello");
+		editor.setSelection(999, 999);
+		expect(editor.getSelection()).toEqual({ start: 6, end: 6 });
+		editor.destroy();
+	});
+
+	it("Tab 行为可配：indent 吃掉 Tab；focus 交给浏览器", () => {
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+		const indent = createPdEditor(el, { value: "a", tabBehavior: "indent" });
+		indent.setSelection(0, 0);
+		const tab1 = new KeyboardEvent("keydown", {
+			key: "Tab",
+			cancelable: true,
+		});
+		indent.textarea.dispatchEvent(tab1);
+		expect(tab1.defaultPrevented).toBe(true);
+		expect(indent.getValue()).toBe("  a");
+		indent.destroy();
+
+		const el2 = document.createElement("div");
+		document.body.appendChild(el2);
+		const focus = createPdEditor(el2, { value: "a", tabBehavior: "focus" });
+		const tab2 = new KeyboardEvent("keydown", {
+			key: "Tab",
+			cancelable: true,
+		});
+		focus.textarea.dispatchEvent(tab2);
+		expect(tab2.defaultPrevented).toBe(false);
+		expect(focus.getValue()).toBe("a");
+		focus.destroy();
+	});
+
+	it("highlightThreshold：超阈值降级纯文本（仍与原文一致）", () => {
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+		const editor = createPdEditor(el, {
+			value: "任务: x",
+			highlightThreshold: 1,
+		});
+		const pre = el.querySelector("pre")!;
+		expect(pre.textContent).toBe("任务: x");
+		expect(pre.innerHTML).not.toContain("pd-key");
+		editor.destroy();
+	});
+
+	it("运行时 update：行号层开关 + 语言切换", () => {
+		const { el, editor } = mount("a: 1\nb: 2", "pd");
+		editor.update({ lineNumbers: true });
+		expect(el.querySelector(".pd-lines")).not.toBeNull();
+		expect(el.querySelectorAll(".pd-ln").length).toBe(2);
+		editor.update({ lineNumbers: false });
+		expect(el.querySelector(".pd-lines")).toBeNull();
+		editor.update({ language: "json" });
+		editor.setValue('{"a": 1}');
+		expect(el.querySelector("pre")!.innerHTML).not.toContain("pd-key");
+		editor.destroy();
+	});
+
+	it("destroy 只移除引擎根节点，不动挂载点的其它子节点", () => {
+		const el = document.createElement("div");
+		const keep = document.createElement("span");
+		keep.textContent = "keep";
+		el.appendChild(keep);
+		document.body.appendChild(el);
+		const editor = createPdEditor(el, { value: "a: 1" });
+		editor.destroy();
+		expect(el.contains(keep)).toBe(true);
+		expect(el.querySelector(".pd-root")).toBeNull();
 	});
 });

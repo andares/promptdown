@@ -1,13 +1,20 @@
-import type { Plugin } from "yace";
-
 /**
- * pd 语义编辑插件（Yace 插件接口，keydown 时返回新的 props）。
+ * pd 语义编辑插件（keydown 时返回新的 props）。
  * 与主包 VSCode 扩展的编辑行为对齐：续行补 `- `、序列项行 Tab 整行缩进/Shift+Tab 缩出。
  *
- * 注意：Yace 插件管线是 reduce（所有插件依次执行、后者覆盖前者），
- * 同一按键只应由一个插件处理——enter 全部由 pdListItem 处理（含非序列行缩进保留），
- * 不要再叠加 Yace 的 preserveIndent。
+ * 插件管线是 reduce（依次执行、后者覆盖前者）——同一按键只应由一个插件处理，
+ * enter 全部由 pdListItem 处理（含非序列行缩进保留），不要再叠加新的 preserveIndent。
  */
+export interface PluginProps {
+	value: string;
+	selectionStart: number;
+	selectionEnd: number;
+}
+
+export type Plugin = (
+	props: PluginProps,
+	event: Event,
+) => Partial<PluginProps> | void;
 
 function isKey(event: Event, combo: string): boolean {
 	const e = event as KeyboardEvent;
@@ -40,7 +47,7 @@ function posFromLineCol(lines: string[], line: number, col: number): number {
 /**
  * 回车续行：
  * - 序列项行（`- ` 或 `-`，允许缩进）→ 新行 = 缩进 + `- `（自动续列表）
- * - 其他行 → 新行保留行首缩进（Yace preserveIndent 行为，合并于此避免插件管线双重处理）
+ * - 其他行 → 新行保留行首缩进（原 preserveIndent 行为，合并于此避免插件管线双重处理）
  * `-x` / `---`（`-` 后无空白）不是列表项，只保留缩进。
  */
 export function pdListItem(): Plugin {
@@ -50,7 +57,7 @@ export function pdListItem(): Plugin {
 		const line = value.slice(0, selectionStart).split("\n").pop() ?? "";
 		const indent = /^\s*/.exec(line)?.[0] ?? "";
 		event.preventDefault();
-		const isListItem = /^(\s*)-(?=\s|$)/.test(line);
+		const isListItem = /^(\s*)-(?=[ ]|$)/.test(line);
 		const insert = `\n${indent}${isListItem ? "- " : ""}`;
 		return {
 			value: value.slice(0, selectionStart) + insert + value.slice(selectionEnd),
@@ -62,7 +69,7 @@ export function pdListItem(): Plugin {
 
 /** 光标所在行是否是序列项行（`- ` 开头或裸 `-`，允许缩进） */
 function isListItemLine(line: string): boolean {
-	return /^(\s*)-(?=\s|$)/.test(line);
+	return /^(\s*)-(?=[ ]|$)/.test(line);
 }
 
 /** 该行行首可去掉的缩进长度（indentUnit 或单个 tab；无则 0） */
