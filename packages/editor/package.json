@@ -1,16 +1,20 @@
 {
   "name": "@andares/pdeditor",
   "version": "0.4.1",
-  "description": "Headless prompt 输入框组件（基于 Yace）：pd/md/xml/json/yaml 语法高亮，语言切换为 API 行为，无 UI 假设",
+  "description": "低 UI prompt 输入框：headless 核心 + <pd-editor> 自定义元素 + React 包装；pd/md/xml/json/yaml 高亮、滚动同步、IME、撤销，主题全走 CSS 变量",
   "type": "module",
   "license": "MIT",
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.map"
   ],
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/element-auto.js",
+    "./dist/element-auto.cjs"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -22,27 +26,63 @@
       "import": "./dist/pd.js",
       "require": "./dist/pd.cjs"
     },
+    "./element": {
+      "types": "./dist/element.d.ts",
+      "import": "./dist/element.js",
+      "require": "./dist/element.cjs"
+    },
+    "./element/auto": {
+      "types": "./dist/element-auto.d.ts",
+      "import": "./dist/element-auto.js",
+      "require": "./dist/element-auto.cjs"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js",
+      "require": "./dist/react.cjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "vite build && vite build --config vite.pd.config.ts && tsc --emitDeclarationOnly",
+    "build": "vite build && vite build --config vite.pd.config.ts && vite build --config vite.element.config.ts && vite build --config vite.element-auto.config.ts && vite build --config vite.react.config.ts && tsc --emitDeclarationOnly",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "vite demo",
-    "build:demo": "vite build --config vite.demo.config.ts",
+    "build:demo": "node scripts/build-demo.mjs",
     "build:editor": "pnpm build && pnpm build:demo"
   },
   "dependencies": {
     "@andares/pdfoundation": "workspace:^"
   },
+  "peerDependencies": {
+    "react": ">=17"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@andares/pdfoundation": "workspace:^",
     "@types/prismjs": "^1.26.6",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "es-toolkit": "^1.51.0",
+    "esbuild": "^0.25.0",
     "jsdom": "^26.0.0",
     "prismjs": "^1.29.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "vite": "^6.0.0",
-    "vitest": "^3.0.0",
-    "yace": "^1.0.0"
+    "vitest": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andares/promptdown.git",
+    "directory": "packages/editor"
+  },
+  "homepage": "https://github.com/andares/promptdown/tree/master/packages/editor",
+  "bugs": {
+    "url": "https://github.com/andares/promptdown/issues"
   }
 }

@@ -47,3 +47,60 @@ describe.skipIf(!built)("dist 产物守卫", () => {
 		expect(read("index.js").toLowerCase()).toContain("prism");
 	});
 });
+
+const builtExtras =
+	existsSync(resolve(dist, "element.js")) &&
+	existsSync(resolve(dist, "element-auto.js")) &&
+	existsSync(resolve(dist, "react.js"));
+
+describe.skipIf(!builtExtras)("element / react 产物守卫", () => {
+	const bareImports = (code: string) => {
+		const out: string[] = [];
+		for (const m of code.matchAll(
+			/import\s*(?:[\s{][^;]*?\sfrom\s*)?["']([^"']+)["']/g,
+		)) out.push(m[1]);
+		for (const m of code.matchAll(/require\(["']([^"']+)["']\)/g))
+			out.push(m[1]);
+		return [
+			...new Set(out.filter((s) => !s.startsWith(".") && !s.startsWith("node:"))),
+		].sort();
+	};
+
+	it("element 入口：不含 Prism，仅 foundation external", () => {
+		const esm = read("element.js");
+		expect(esm.toLowerCase()).not.toContain("prism");
+		expect(bareImports(esm)).toEqual(["@andares/pdfoundation"]);
+		expect(bareImports(read("element.cjs"))).toEqual([
+			"@andares/pdfoundation",
+		]);
+	});
+
+	it("element/auto：包含 customElements 注册且同样自包含", () => {
+		const esm = read("element-auto.js");
+		expect(esm).toContain("customElements");
+		expect(esm.toLowerCase()).not.toContain("prism");
+		expect(bareImports(esm)).toEqual(["@andares/pdfoundation"]);
+	});
+
+	it("react 入口：react + foundation external，不含 Prism", () => {
+		const esm = read("react.js");
+		expect(bareImports(esm).sort()).toEqual([
+			"@andares/pdfoundation",
+			"react",
+		]);
+		expect(esm.toLowerCase()).not.toContain("prism");
+		expect(bareImports(read("react.cjs")).sort()).toEqual([
+			"@andares/pdfoundation",
+			"react",
+		]);
+	});
+
+	it("类型出口：element / react 的 d.ts 可解析", () => {
+		expect(readFileSync(resolve(dist, "element.d.ts"), "utf8")).toContain(
+			"definePdEditor",
+		);
+		expect(readFileSync(resolve(dist, "react.d.ts"), "utf8")).toContain(
+			'from "react"',
+		);
+	});
+});
