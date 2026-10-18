@@ -31,6 +31,8 @@ const PKG_DIR = join(ROOT, "packages", "editor");
 const PKG_PATH = join(PKG_DIR, "package.json");
 const CHANGELOG_PATH = join(PKG_DIR, "CHANGELOG.md");
 const DEV_CHANGELOG_PATH = join(PKG_DIR, "CHANGELOG.dev.md");
+const FOUNDATION_PKG_PATH = join(ROOT, "packages", "pdfoundation", "package.json");
+const FOUNDATION_NAME = "@andares/pdfoundation";
 const BUMPS = ["major", "minor", "patch"];
 const PKG_NAME = "@andares/pdeditor";
 
@@ -104,10 +106,12 @@ function run(cmd, args, opts = {}) {
 }
 
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 if (dryRun) {
 	console.log(`\n${C.dim}--dry-run -- nothing changed. Would run:${C.reset}`);
 	console.log(`  1. pnpm --filter ${PKG_NAME} typecheck && test && build`);
+	console.log(`  1.5 前置检查：${FOUNDATION_NAME} 目标版本已在 npm（否则 ETARGET）`);
 	console.log(`  2. bump packages/editor/package.json version → ${next}`);
 	console.log(
 		`  3. CHANGELOG.dev.md 存在且有内容 → 归档为 packages/editor/CHANGELOG.md 顶部 "## ${next} (YYYY-MM-DD)"（无则提示跳过）`,
@@ -124,6 +128,32 @@ step("typecheck + test + build（组件包）");
 run(pnpm, ["--filter", PKG_NAME, "typecheck"]);
 run(pnpm, ["--filter", PKG_NAME, "test"]);
 run(pnpm, ["--filter", PKG_NAME, "build"]);
+
+// 1.5 前置检查：dependencies 的 foundation（workspace:^）发布时会改写成本地版本，
+//     目标版本必须已在 npm；否则消费方安装时报 ETARGET。先于 bump，失败不留半成品。
+step(`前置检查：${FOUNDATION_NAME} 目标版本已在 npm`);
+const foundationVersion = JSON.parse(
+	readFileSync(FOUNDATION_PKG_PATH, "utf8"),
+).version;
+if (typeof pkg.dependencies?.[FOUNDATION_NAME] === "string") {
+	const probe = spawnSync(
+		npm,
+		["view", `${FOUNDATION_NAME}@${foundationVersion}`, "version"],
+		{ cwd: ROOT, encoding: "utf8" },
+	);
+	if (probe.status !== 0) {
+		console.error(
+			`${C.red}${FOUNDATION_NAME}@${foundationVersion} 尚未在 npm（或网络不可用）。${C.reset}`,
+		);
+		console.error(
+			`  请先运行 pnpm release-all（发布 foundation 同号版本）并等待 npm 传播，再跑 release-editor。`,
+		);
+		process.exit(1);
+	}
+	console.log(`${C.green}✅ ${FOUNDATION_NAME}@${foundationVersion} 已在 npm${C.reset}`);
+} else {
+	console.log(`${C.dim}editor 未依赖 ${FOUNDATION_NAME}，跳过${C.reset}`);
+}
 
 // 2. Bump packages/editor/package.json（2 空格缩进 + 尾换行）。
 step(`bump version → ${next}`);

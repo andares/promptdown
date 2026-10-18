@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck（三包）
+        run: pnpm typecheck:all
+
+      - name: Test（三包）
+        run: pnpm test:all
+
+      - name: Build（foundation + main + editor + demo）
+        run: pnpm build:all
+
+      - name: Package contents（npm tarball 白名单）
+        run: |
+          npm pack --dry-run
+          (cd packages/pdfoundation && npm pack --dry-run)
+          (cd packages/editor && npm pack --dry-run)
