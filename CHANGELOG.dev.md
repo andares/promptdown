@@ -1,0 +1,2 @@
+- **修复（CI/门禁顺序）**：门禁固定为「先构建再校验」——三包的 typecheck/test 都经 foundation 的 `dist` 解析类型与运行时，全新 clone 没有 dist 时直接 typecheck 会误报 `Cannot find module '@andares/pdfoundation'`（CI 首跑即因此失败）。`build:all` 改为 foundation → 主包 → editor；CI 与 `release-all` 门禁统一为同序的 `build:all → typecheck:all → test:all`（少跑一遍重复构建）。AGENTS/README 记录该顺序。
+- **CI 加固**：actions 固定到 commit SHA（checkout v7 / pnpm-action-setup v6 / setup-node v7），`permissions: contents: read` 最小权限，checkout `persist-credentials: false`（修 zizmor/Semgrep 告警：unpinned-uses / excessive-permissions / artipacked）。

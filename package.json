@@ -144,7 +144,7 @@
     "release-editor": "node ./scripts/publish-editor.mjs",
     "typecheck:all": "pnpm --filter @andares/pdfoundation typecheck && pnpm --filter @andares/pdeditor typecheck && pnpm typecheck",
     "test:all": "pnpm --filter @andares/pdfoundation test && pnpm --filter @andares/pdeditor test && pnpm test",
-    "build:all": "pnpm --filter @andares/pdeditor build:editor && pnpm build"
+    "build:all": "pnpm build && pnpm --filter @andares/pdeditor build:editor"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

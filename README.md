@@ -439,10 +439,10 @@ promptdown 由三个 npm 包组成，1.0 后以下公共面**冻结**（不可�
 
 ```bash
 pnpm install
-pnpm typecheck:all   # 三包类型检查（foundation + editor + 主包）
-pnpm test:all        # 三包测试（26 主包 + 180 foundation + 82 editor）
-pnpm build:all       # foundation + 主包 + editor（含单文件 demo）
-pnpm typecheck       # 只跑主包（兼容旧命令）
+pnpm build:all       # ① 先构建：foundation → 主包 → editor（含单文件 demo）
+pnpm typecheck:all   # ② 三包类型检查（foundation + editor + 主包）
+pnpm test:all        # ③ 三包测试（26 主包 + 180 foundation + 82 editor）
+pnpm typecheck       # 只跑主包（兼容旧命令，需 foundation 已构建）
 pnpm test            # 只跑主包（兼容旧命令）
 pnpm build           # 只跑主包（会先构建 foundation）
 pnpm package         # 以 --no-dependencies 打包 .vsix

@@ -25,8 +25,9 @@
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm typecheck` | `tsc --noEmit` 类型检查 |
-| `pnpm test` | node:test 跑 `test/*.test.ts`（tsx 执行） |
+| `pnpm typecheck` | `tsc --noEmit` 类型检查（只主包；需 foundation 已构建） |
+| `pnpm test` | node:test 跑 `test/*.test.ts`（tsx 执行；只主包） |
+| `pnpm build:all` → `pnpm typecheck:all` → `pnpm test:all` | **三包门禁（顺序固定，与 CI 一致）**：先构建（foundation dist 提供类型与运行时）→ 再类型检查 → 再测试 |
 | `pnpm perf` | 性能基准（10 副本样本 2099 行/150 段；`pnpm perf:gen [份数]` 重新生成，产物 `perf/generated/` 不入库） |
 | `pnpm build` | tsc 编译到 `dist/` |
 | `node dist/format-cli.js <file> [-w]` | 格式化 pd 文本（发布后为 `pdformat` 命令） |
@@ -172,7 +173,7 @@ packages/editor/            # 低 UI 输入框 @andares/pdeditor（工厂 + <pd-
 - 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/promptdown/SKILL.md` → fixtures
 - 格式化规则（`packages/pdfoundation/src/format.ts`）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
 - **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
-- 发布前必须跑 `pnpm typecheck:all && pnpm test:all`，全部通过才可 `pnpm release-all` / `pnpm release-editor`（release-all 门禁已含 foundation + editor）
+- 发布前必须跑 `pnpm build:all && pnpm typecheck:all && pnpm test:all`（**顺序固定：先构建再校验**——三包的 typecheck/test 都经 foundation 的 `dist` 解析类型与运行时，全新 clone 没有 dist 时直接 typecheck 会误报 `Cannot find module '@andares/pdfoundation'`），全部通过才可 `pnpm release-all` / `pnpm release-editor`（两条发布入口的门禁已按同一顺序）
 - **editor 功能改动后必须重建 demo**：`packages/editor/` 的 `src/` 或 `demo/` 有任何改动后，必须重新构建单文件 demo——`pnpm --filter @andares/pdeditor build:demo`（或一步到位 `build:editor` = lib build + demo build），保证 `demo-dist/` 与源码同步（demo-dist 是本地产物，gitignored 不入库，但用户直接打开它查看效果，旧产物会误导）
 - `.npmignore` 控制发布内容（pnpm 复用 npm 的发布文件机制，勿删）；新增发布文件记得检查它
 - **计划/方案文件为一次性任务产物**：完成后删除，不留仓库根目录（完整过程轨迹保留在 git 历史与 commit message）；需要常驻的设计文档放 `docs/`

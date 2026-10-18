@@ -181,7 +181,7 @@ if (dryRun) {
 		`  0. sync：未提交改动 → git add -A + commit；未推送 → git push origin ${branch}（无则跳过）`,
 	);
 	console.log(
-		`  1. pnpm typecheck && pnpm test && pnpm build（另跑 foundation typecheck/test + editor typecheck/test/build）`,
+		`  1. pnpm build:all && pnpm typecheck:all && pnpm test:all（与 CI 同序：先构建再校验）`,
 	);
 	console.log(
 		`  2. bump 主包 package.json version → ${next} + 同步 bump packages/pdfoundation version → ${next}（同号绑定）`,
@@ -315,16 +315,13 @@ if (hasUpstream) {
 }
 
 // 1. Checks gate — abort before anything is changed if they fail.
-//    含 foundation 门禁（主包 build 链已触发 foundation build；这里补 test）。
-step("typecheck + test + build（含 foundation + editor）");
-run(pnpm, ["typecheck"]);
-run(pnpm, ["--filter", FOUNDATION_NAME, "typecheck"]);
-run(pnpm, ["test"]);
-run(pnpm, ["--filter", FOUNDATION_NAME, "test"]);
-run(pnpm, ["--filter", EDITOR_NAME, "typecheck"]);
-run(pnpm, ["--filter", EDITOR_NAME, "test"]);
-run(pnpm, ["--filter", EDITOR_NAME, "build"]);
-run(pnpm, ["build"]);
+//    与 CI 完全同序（build:all → typecheck:all → test:all）：先构建再校验——
+//    三包的 typecheck/test 都经 foundation 的 dist 解析类型与运行时，
+//    没有 dist 时（全新 clone / 清过 dist）直接 typecheck 会误报找不到模块。
+step("build + typecheck + test（三包，与 CI 同序）");
+run(pnpm, ["build:all"]);
+run(pnpm, ["typecheck:all"]);
+run(pnpm, ["test:all"]);
 
 // 2. Bump 主包 version + 同步 bump foundation version（同号绑定）。
 //    格式化保持 2-space indent + trailing newline。

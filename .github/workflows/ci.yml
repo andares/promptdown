@@ -9,17 +9,24 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# 最小权限：CI 只读仓库内容（zizmor excessive-permissions）
+permissions:
+  contents: read
+
 jobs:
   gates:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # actions 固定到 commit SHA（可供应链安全审计）；括号里是等价 tag，便于升级
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false # 不把 token 留在 .git/config
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 12
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: pnpm
@@ -27,15 +34,20 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # 顺序必须「先构建再校验」：三包的 typecheck/test 都经 foundation 的
+      # dist 解析类型与运行时（workspace 软链包），全新 clone 没有 dist 时
+      # 直接 typecheck 会报 Cannot find module '@andares/pdfoundation'。
+      # build:all = foundation → 主包 → editor（含单文件 demo）。
+      - name: Build（foundation → 主包 → editor + 单文件 demo）
+        run: pnpm build:all
+
       - name: Typecheck（三包）
         run: pnpm typecheck:all
 
       - name: Test（三包）
         run: pnpm test:all
 
-      - name: Build（foundation + main + editor + demo）
-        run: pnpm build:all
-
+      # dist 已由上面的构建产出，这里校验的是「发布清单」本身
       - name: Package contents（npm tarball 白名单）
         run: |
           npm pack --dry-run
