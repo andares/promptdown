@@ -1,4 +1,4 @@
-import { lexLine, splitInlineCode } from "./lexer";
+import { lexLine, SECTION_RE, splitInlineCode } from "./lexer";
 import type { PLine } from "./types";
 
 export interface Section {
@@ -16,7 +16,6 @@ interface RefToken {
 // 引用名 = 冒号后紧贴的非空白字符序列（UTF-8，天然支持中文），到下一个空白结束。
 const REF_RE = /(?:^|\s):([^\s-][^\s]*)(?=\s|$)/g;
 const MAX_DEPTH = 32;
-const SECTION_RE = /^\/\/!pd(?:\s+([^\s]+))?$/;
 
 /** 命名转义：首字符 % → 加倍（与数字序号 %N 区分；不判断是否已是 %%） */
 export function escapeSectionName(name: string): string {

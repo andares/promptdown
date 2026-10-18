@@ -290,6 +290,18 @@ test("段名含空格 → 整行不是段标记（当普通内容）", () => {
 	); // 隐式段（preamble 被吞）
 });
 
+test("段标记严格整行：//!pdx / //!pd 名 字 是普通文本，解析不丢行", () => {
+	assert.equal(lexLine("//!pdx", 1).kind, "text");
+	assert.equal(lexLine("//!pd 名 字", 1).kind, "text");
+	assert.equal(lexLine("//!pd", 1).kind, "section");
+	assert.equal(lexLine("//!pd 任务", 1).kind, "section");
+
+	const a = fromText("//!pdx\na: 1\n") as Record<string, unknown>;
+	assert.deepEqual(a, { Subject1: { Info1: ["//!pdx"] }, a: "1" });
+	const b = fromText("//!pd 名 字\na: 1\n") as Record<string, unknown>;
+	assert.deepEqual(b, { Subject1: { Info1: ["//!pd 名 字"] }, a: "1" });
+});
+
 test("连续段标记 → 中间空段（编译输出空串）", () => {
 	const s = splitSections("//!pd x\n//!pd y\n内容\n");
 	assert.deepEqual(

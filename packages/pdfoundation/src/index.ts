@@ -41,4 +41,10 @@ export {
 } from "./parser/expand";
 
 // 行内代码拆段（`code` 配对标记）：工具函数（perf 基准 / 消费方文本处理用）
-export { splitInlineCode } from "./parser/lexer";
+export {
+	SECTION_RE,
+	findKeyValueSeparator,
+	hasLiteralColon,
+	matchKeyValue,
+	splitInlineCode,
+} from "./parser/lexer";

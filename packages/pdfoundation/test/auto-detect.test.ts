@@ -34,8 +34,12 @@ test("detectPdIntent: 无标记纯文本 → false", () => {
 	assert.equal(detectPdIntent("你好\n世界\n这是普通文本"), false);
 });
 
-test("detectPdIntent: //!pdx 不是段标记（\\b 词边界）", () => {
+test("detectPdIntent: //!pdx 不是段标记（整行锚定）", () => {
 	assert.equal(detectPdIntent("//!pdx 不是段标记"), false);
+});
+
+test("detectPdIntent: 段名含空格不是段标记（与 splitSections 同规则）", () => {
+	assert.equal(detectPdIntent("//!pd 名 字"), false);
 });
 
 test("detectPdIntent: 行中的 //!pd 不算（必须行首）", () => {
@@ -75,6 +79,7 @@ test("isPdMarkerLine: 完整标记行", () => {
 
 test("isPdMarkerLine: 非标记行", () => {
 	assert.equal(isPdMarkerLine("//!pdx"), false);
+	assert.equal(isPdMarkerLine("//!pd 名 字"), false);
 	assert.equal(isPdMarkerLine("// 普通注释"), false);
 	assert.equal(isPdMarkerLine("foo //!pd"), false);
 	assert.equal(isPdMarkerLine("hello"), false);

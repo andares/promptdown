@@ -1,6 +1,14 @@
 import type { PLine } from "./types";
 
 /**
+ * 段标记整行正则（SPEC 第 4 章）：`//!pd` 或 `//!pd <name>`，段名不含空白。
+ * **必须整行匹配**——`//!pdx`、`//!pd 名 字` 都不是段标记，按普通文本处理。
+ * 行首允许缩进（调用方先 trim）。splitSections / lexLine / auto-detect 共用本正则，
+ * 避免“切段严格、分词宽松”两套判定导致整行被 parser 丢弃。
+ */
+export const SECTION_RE = /^\/\/!pd(?:\s+([^\s]+))?$/;
+
+/**
  * 行内代码切分（markdown 风格整体理解）：`` `...` `` 单 backtick 配对。
  * 返回交替的普通段 / 代码段；**不支持换行**——未闭合 backtick 跨行即失效，
  * 未闭合部分当普通字符（code=false）。lexer/format/expand/jsonToPd 共用。
@@ -45,23 +53,28 @@ export function hasLiteralColon(s: string): boolean {
 	return false;
 }
 
+/**
+ * 行内代码段外第一个半角冒号的位置（-1 = 无）。
+ * 供高亮层/消费方定位原始文本中的分隔符（精确 slice，保证与原文逐字符对齐）。
+ */
+export function findKeyValueSeparator(s: string): number {
+	let pos = 0;
+	for (const { code, seg } of splitInlineCode(s)) {
+		if (!code) {
+			const idx = seg.indexOf(":");
+			if (idx !== -1) return pos + idx;
+		}
+		pos += seg.length;
+	}
+	return -1;
+}
+
 /** 单行键值判定（lexLine 与 jsonToPd 复用）；行内代码段内的冒号不参与 */
 export function matchKeyValue(
 	s: string,
 ): { key: string; value: string | undefined } | null {
 	if (hasLiteralColon(s)) return null;
-	let separator = -1;
-	let pos = 0;
-	for (const { code, seg } of splitInlineCode(s)) {
-		if (!code) {
-			const idx = seg.indexOf(":");
-			if (idx !== -1) {
-				separator = pos + idx;
-				break;
-			}
-		}
-		pos += seg.length;
-	}
+	const separator = findKeyValueSeparator(s);
 	if (separator === -1) return null;
 
 	const key = s.slice(0, separator);
@@ -78,7 +91,7 @@ export function lexLine(raw: string, lineNo: number): PLine {
 	const text = raw.trim();
 	if (text === "") return { kind: "blank", indent, text, raw, lineNo };
 	if (text === "---") return { kind: "separator", indent, text, raw, lineNo };
-	if (text.startsWith("//!pd"))
+	if (SECTION_RE.test(text))
 		return { kind: "section", indent, text, raw, lineNo };
 
 	// 带 - 行

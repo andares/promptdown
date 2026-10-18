@@ -6,8 +6,7 @@
  * 有自身语法的文件（md/js/ts...）不参与检测（由 extension.ts 的 languageId 守卫排除）。
  */
 
-/** 段标记行：行首（允许缩进）+ //!pd + 词边界（防 //!pdx 误判） */
-const PD_MARKER_LINE_RE = /^\s*\/\/!pd\b/;
+import { SECTION_RE } from "./parser/lexer";
 
 /** 预筛：行首（允许缩进）是 // —— 只有注释风格的行才可能成为段标记 */
 const PD_PREFIX_RE = /^\s*\/\//;
@@ -23,7 +22,7 @@ export function detectPdIntent(text: string, maxLines = 50): boolean {
  let inFence = false;
  for (let i = 0; i < n; i++) {
   const line = lines[i] as string;
-  if (!inFence && PD_MARKER_LINE_RE.test(line)) return true;
+  if (!inFence && SECTION_RE.test(line.trim())) return true;
   if (line.trim().startsWith("```")) inFence = !inFence;
  }
  return false;
@@ -39,5 +38,5 @@ export function mayBeCommentLine(line: string): boolean {
 
 /** 输入时完整判定：变更行已是 //!pd 段标记行 */
 export function isPdMarkerLine(line: string): boolean {
- return PD_MARKER_LINE_RE.test(line);
+ return SECTION_RE.test(line.trim());
 }
