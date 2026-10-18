@@ -3,118 +3,303 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>@andares/pdeditor demo</title>
+		<title>@andares/pdeditor — 低 UI 提示词输入框</title>
 		<style>
-			/* 极简测试页样式：高亮 token 配色 + 输入框布局（headless 组件零样式，样式由外部定义） */
+			:root {
+				--bg: #f6f3ec;
+				--surface: #fffdf8;
+				--surface-2: #f1ece1;
+				--text: #27251f;
+				--muted: #726c60;
+				--line: #e0d9cb;
+				--accent: #a94f27;
+				--accent-2: #2f6f63;
+				--shadow: 0 1px 0 rgba(39, 37, 31, 0.04), 0 12px 32px -24px rgba(39, 37, 31, 0.35);
+				--sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+				--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+			}
+			[data-theme="dark"] {
+				--bg: #161512;
+				--surface: #1e1c18;
+				--surface-2: #26231d;
+				--text: #e9e4d8;
+				--muted: #9b9485;
+				--line: #353029;
+				--accent: #e08a5f;
+				--accent-2: #7fc0b2;
+				--shadow: 0 1px 0 rgba(255, 255, 255, 0.02), 0 16px 40px -28px rgba(0, 0, 0, 0.8);
+			}
+			* { box-sizing: border-box; }
+			/* 用页面调色板覆盖组件的中性 token（CSS 变量继承进 shadow DOM） */
+			pd-editor {
+				--pd-token-key: var(--accent-2);
+				--pd-token-item: var(--accent-2);
+				--pd-token-inline-code: var(--accent-2);
+				--pd-token-ref: var(--accent);
+				--pd-token-section: var(--accent);
+				--pd-token-fence: var(--muted);
+				--pd-token-punct: var(--muted);
+			}
+			html { color-scheme: light; }
+			[data-theme="dark"] { color-scheme: dark; }
 			body {
-				font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-				margin: 24px;
-				background: #1e1e1e;
-				color: #d4d4d4;
+				margin: 0;
+				background: radial-gradient(1200px 500px at 15% -10%, var(--surface-2), transparent 70%), var(--bg);
+				color: var(--text);
+				font-family: var(--sans);
+				font-size: 15px;
+				line-height: 1.6;
 			}
-			h1 {
-				font-size: 16px;
-				color: #9cdcfe;
+			.page { width: min(1080px, 100% - 40px); margin: 0 auto; padding: 48px 0 72px; }
+			.eyebrow { font: 600 12px/1.2 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+			h1 { margin: 10px 0 8px; font-size: clamp(30px, 4vw, 46px); line-height: 1.1; letter-spacing: -0.03em; }
+			.lede { max-width: 62ch; margin: 0; color: var(--muted); font-size: 16px; }
+			.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+			.theme-toggle { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font: 500 12px var(--sans); cursor: pointer; }
+			section { margin-top: 40px; }
+			h2 { font-size: 15px; letter-spacing: 0.01em; margin: 0 0 6px; }
+			.hint { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+			.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+			.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+			.card.wide { grid-column: span 2; }
+			.composer {
+				display: flex; align-items: flex-end; gap: 10px;
+				border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2);
+				padding: 10px 10px 10px 14px; transition: border-color 160ms ease;
 			}
-			.toolbar {
-				margin-bottom: 12px;
-				display: flex;
-				gap: 8px;
-				align-items: center;
+			.composer:focus-within { border-color: var(--accent); }
+			.composer pd-editor { flex: 1; min-height: 48px; font-size: 14px; --pd-placeholder-opacity: 0.42; }
+			.send { border: 0; border-radius: 10px; padding: 9px 14px; background: var(--accent); color: #fff; font: 600 13px var(--sans); cursor: pointer; }
+			.send:disabled { opacity: 0.35; cursor: default; }
+			.mirror {
+				margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px;
+				font: 12px/1.6 var(--mono); color: var(--muted); white-space: pre-wrap; min-height: 40px;
 			}
-			.toolbar select,
-			.toolbar button {
-				background: #333;
-				color: #d4d4d4;
-				border: 1px solid #555;
-				padding: 4px 10px;
-				border-radius: 4px;
-				font-size: 13px;
-				cursor: pointer;
+			.field { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+			.label { display: block; font: 600 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+			pd-editor.note { font-size: 13px; --pd-line-height: 1.65; }
+			/* light DOM 模式：宿主直接给 token class 上色（shadow 模式则用 --pd-token-* 变量） */
+			pd-editor.note .pd-key { color: var(--accent-2); }
+			pd-editor.note .pd-ref { color: var(--accent); }
+			.inherit { font-family: Georgia, "Songti SC", serif; font-size: 17px; line-height: 1.8; color: var(--text); }
+			.inherit pd-editor { --pd-line-height: 1.8; }
+			.inherit .pd-key { color: var(--accent); }
+			.inherit .pd-ref { color: var(--accent-2); }
+			.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+			.toolbar button, .toolbar select {
+				border: 1px solid var(--line); background: var(--surface); color: var(--text);
+				border-radius: 8px; padding: 6px 10px; font: 500 12px var(--sans); cursor: pointer;
 			}
-			.toolbar span {
-				font-size: 12px;
-				color: #888;
-			}
-
-			/* 输入框容器（外部框架定义布局）—— headless 核心挂载到这里 */
-			.editor-box {
-				border: 1px solid #444;
-				border-radius: 6px;
-				background: #252526;
-				overflow: hidden;
-				min-height: 260px;
-			}
-			/* pd 高亮 token 配色（与 TextMate scope 对应） */
-			.pd-key {
-				color: #9cdcfe;
-			}
-			.pd-key-punct {
-				color: #d4d4d4;
-			}
-			.pd-item {
-				color: #569cd6;
-			}
-			.pd-section {
-				color: #c586c0;
-			}
-			.pd-sep {
-				color: #569cd6;
-			}
-			.pd-ref {
-				color: #ce9178;
-			}
-			.pd-inline-code {
-				color: #dcdcaa;
-				background: #2d2d30;
-				border-radius: 3px;
-			}
-			.pd-fence {
-				color: #6a9955;
-			}
-			/* Prism token（md/xml/json/yaml） */
-			.token.comment,
-			.token.prolog,
-			.token.doctype {
-				color: #6a9955;
-			}
-			.token.string,
-			.token.attr-value {
-				color: #ce9178;
-			}
-			.token.keyword,
-			.token.operator,
-			.token.tag {
-				color: #569cd6;
-			}
-			.token.number,
-			.token.boolean {
-				color: #b5cea8;
-			}
-			.token.punctuation {
-				color: #d4d4d4;
-			}
-			.token.function,
-			.token.property {
-				color: #dcdcaa;
+			.toolbar button:hover { border-color: var(--accent); }
+			.toolbar .spacer { flex: 1; }
+			.editor-shell { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); padding: 18px 20px; box-shadow: var(--shadow); }
+			.editor-shell pd-editor { font-size: 14px; --pd-line-height: 1.6; }
+			.statusbar { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font: 12px var(--mono); color: var(--muted); }
+			.statusbar .status { color: var(--accent-2); }
+			.frameworks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+			.frameworks .card { padding: 16px; }
+			.frameworks h3 { margin: 0 0 8px; font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+			.hint code, .lede code { font-family: var(--mono); font-size: .92em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+			.token-preview .pd-key { color: var(--accent-2); }
+			.token-preview .pd-key-punct { color: var(--muted); }
+			.token-preview .pd-item { color: var(--accent); }
+			.token-preview .pd-ref { color: var(--accent); }
+			.token-preview .pd-inline-code { color: var(--accent-2); }
+			.token-preview .pd-section { color: var(--muted); }
+			pre.snippet { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); overflow: auto; font: 12px/1.65 var(--mono); color: var(--text); }
+			.token-preview { display: flex; flex-wrap: wrap; gap: 10px 14px; font: 12px var(--mono); color: var(--muted); }
+			.selftest { border-top: 1px solid var(--line); padding-top: 24px; }
+			.selftest button { border: 1px solid var(--accent); background: transparent; color: var(--accent); border-radius: 8px; padding: 7px 12px; font: 600 12px var(--sans); cursor: pointer; }
+			#selftest-out { margin: 12px 0 0; padding: 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font: 12px/1.7 var(--mono); white-space: pre-wrap; min-height: 42px; }
+			footer { margin-top: 48px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+			@media (max-width: 760px) {
+				.page { width: min(100% - 24px, 1080px); padding-top: 28px; }
+				.grid, .frameworks { grid-template-columns: 1fr; }
+				.card.wide { grid-column: span 1; }
 			}
 		</style>
 	</head>
 	<body>
-		<h1>@andares/pdeditor — headless 输入框 demo</h1>
-		<div class="toolbar">
-			<select id="lang">
-				<option value="pd" selected>pd</option>
-				<option value="md">md</option>
-				<option value="xml">xml</option>
-				<option value="json">json</option>
-				<option value="yaml">yaml</option>
-			</select>
-			<button id="fmt">格式化（pd）</button>
-			<button id="transform">转换 JSON ↔ PD</button>
-			<span id="status"></span>
-		</div>
-		<div id="editor" class="editor-box"></div>
+		<main class="page">
+			<header>
+				<div class="topbar">
+					<div>
+						<div class="eyebrow">@andares/pdeditor</div>
+						<h1>低 UI 提示词输入框</h1>
+					</div>
+					<button class="theme-toggle" id="theme-toggle" type="button">切换深色</button>
+				</div>
+				<p class="lede">
+					核心只负责文本、光标与高亮；边框、背景、工具栏、发送按钮全部由宿主决定。
+					下面是三种“直接嵌入”的姿势，以及一层用它的 API 搭出来的基础 UI。
+				</p>
+			</header>
+
+			<section>
+				<div class="grid">
+					<article class="card">
+						<h2>低 UI · 聊天输入</h2>
+						<p class="hint">组件不画边框、不抢字体；输入变化经 <code>pd-input</code> 事件交给宿主。</p>
+						<div class="composer">
+							<pd-editor
+								id="chat"
+								placeholder="描述你想让模型做的事…"
+								aria-label="聊天输入"
+							></pd-editor>
+							<button class="send" id="chat-send" type="button" disabled>发送</button>
+						</div>
+						<div class="mirror" id="chat-mirror">（这里镜像当前值）</div>
+					</article>
+
+					<article class="card">
+						<h2>低 UI · 表单 / 侧栏</h2>
+						<p class="hint">light DOM 模式（<code>shadow="false"</code>）：宿主可以直接用 <code>.pd-key</code> 等 class 上色。</p>
+						<label class="label" for="note">系统提示词</label>
+						<div class="field">
+							<pd-editor
+								id="note"
+								class="note"
+								shadow="false"
+								placeholder="写给模型的人设与约束…"
+								aria-label="系统提示词"
+							></pd-editor>
+						</div>
+						<p class="hint" style="margin: 12px 0 0">没有工具栏、没有状态栏；只有一个能精确编辑文本的输入区。</p>
+					</article>
+
+					<article class="card inherit">
+						<h2 style="font-family: var(--sans)">低 UI · 继承宿主排版</h2>
+						<p class="hint" style="font-family: var(--sans)">不传任何样式时，字体、字号、颜色全部继承。下面是 17px 衬线正文里的编辑器。</p>
+						<pd-editor
+							id="inherit"
+							shadow="false"
+							placeholder="在衬线字体里也能精确输入…"
+							aria-label="继承排版示例"
+						></pd-editor>
+					</article>
+
+					<article class="card">
+						<h2>主题是 CSS 变量，不是 API</h2>
+						<p class="hint">token 默认由 <code>currentColor</code> 派生，任何底色都不突兀；需要品牌色时覆盖变量即可。</p>
+						<pre class="snippet"><code>pd-editor {
+  --pd-font-size: 14px;
+  --pd-line-height: 1.6;
+  --pd-token-key: #2f6f63;
+  --pd-token-ref: #a94f27;
+  --pd-placeholder-opacity: .45;
+  --pd-focus-ring: none;
+}</code></pre>
+						<div class="token-preview" style="margin-top: 12px">
+							<span class="pd-key">键名</span><span class="pd-key-punct">:</span>
+							<span class="pd-item">- 序列</span><span class="pd-ref">:引用</span>
+							<span class="pd-inline-code">`行内代码`</span><span class="pd-section">//!pd</span>
+						</div>
+					</article>
+				</div>
+			</section>
+
+			<section>
+				<h2>基础 UI 层：用同一套 API 搭一个工具栏</h2>
+				<p class="hint">格式化、双向转换、语言切换、复制、清空、计数——全部是宿主代码；核心没有多出一行 UI。</p>
+				<div class="toolbar">
+					<label class="hint" for="lang" style="margin: 0">语言</label>
+					<select id="lang">
+						<option value="pd" selected>pd</option>
+						<option value="json">json</option>
+						<option value="md">md</option>
+						<option value="yaml">yaml</option>
+						<option value="xml">xml</option>
+					</select>
+					<button id="format" type="button">格式化</button>
+					<button id="transform" type="button">PD ↔ JSON</button>
+					<button id="copy" type="button">复制</button>
+					<button id="clear" type="button">清空</button>
+					<span class="spacer"></span>
+					<button id="undo" type="button">撤销</button>
+					<button id="redo" type="button">重做</button>
+				</div>
+				<div class="editor-shell">
+					<pd-editor id="main-editor" language="pd" aria-label="提示词编辑器"></pd-editor>
+				</div>
+				<div class="statusbar">
+					<span id="count"></span>
+					<span class="status" id="status"></span>
+				</div>
+			</section>
+
+			<section>
+				<h2>各框架怎么用</h2>
+				<p class="hint">自定义元素是共同底座；React 有官方薄包装，其余框架直接绑定 property / 事件即可。</p>
+				<div class="frameworks">
+					<div class="card">
+						<h3>React</h3>
+						<pre class="snippet"><code>import { PdEditor } from "@andares/pdeditor/react";
+
+&lt;PdEditor
+  defaultValue="任务: 写一个防抖搜索"
+  onValueChange={setValue}
+/&gt;</code></pre>
+					</div>
+					<div class="card">
+						<h3>Preact</h3>
+						<pre class="snippet"><code>import "@andares/pdeditor/element/auto";
+
+&lt;pd-editor
+  ref={ref}
+  onInput={() =&gt; setValue(ref.current.value)}
+/&gt;</code></pre>
+					</div>
+					<div class="card">
+						<h3>Solid</h3>
+						<pre class="snippet"><code>import "@andares/pdeditor/element/auto";
+
+&lt;pd-editor
+  ref={el}
+  prop:value={value()}
+  on:pd-input={e =&gt; setValue(e.detail.value)}
+/&gt;</code></pre>
+					</div>
+					<div class="card">
+						<h3>Vue 3</h3>
+						<pre class="snippet"><code>// vite.config.ts
+vue({ template: { compilerOptions: {
+  isCustomElement: t =&gt; t === "pd-editor"
+} } })
+
+&lt;pd-editor :value="value"
+  @pd-input="value = $event.detail.value" /&gt;</code></pre>
+					</div>
+					<div class="card">
+						<h3>Svelte</h3>
+						<pre class="snippet"><code>import "@andares/pdeditor/element/auto";
+
+&lt;pd-editor bind:this={el}
+  on:pd-input={e =&gt; value = e.detail.value} /&gt;</code></pre>
+					</div>
+					<div class="card">
+						<h3>原生 / CDN</h3>
+						<pre class="snippet"><code>&lt;script type="module"&gt;
+  import "@andares/pdeditor/element/auto";
+&lt;/script&gt;
+
+&lt;pd-editor language="pd"
+  placeholder="直接写…"&gt;&lt;/pd-editor&gt;</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<section class="selftest">
+				<h2>浏览器几何自检</h2>
+				<p class="hint">覆盖层对齐、固定高度滚动同步、占位符、aria-hidden、光栅宽度——在真实浏览器里跑一遍。</p>
+				<button id="selftest" type="button">运行自检</button>
+				<pre id="selftest-out">尚未运行。</pre>
+			</section>
+
+			<footer>
+				<span>@andares/pdeditor · 单文件 demo（双击即可打开）</span>
+				<span>语义核心：@andares/pdfoundation</span>
+			</footer>
+		</main>
 		<script type="module" src="./main.ts"></script>
 	</body>
 </html>

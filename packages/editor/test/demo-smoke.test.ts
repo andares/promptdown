@@ -1,71 +1,80 @@
-// demo 按钮接线冒烟（DOM 事件 → 主包函数 → setValue 回写 / status 提示）：
-// 防回归——demo 页结构或按钮逻辑改动时此测试会失败，提示同步验证 demo 产物。
+// demo 接线冒烟：真实 demo 的 playground 部分（格式化 / 转换 / 语言 / 计数）。
+// 防回归——demo 结构或按钮逻辑改动时此测试会失败，提示同步验证 demo 产物。
 import { describe, expect, it } from "vitest";
+import { mountDemo } from "../demo/app";
+import type { PdEditorElement } from "../src/element";
 
-describe("demo 按钮冒烟", () => {
-	it("多段报错 + 单段来回转换 + 语言切换 + fmt 非 pd 提示", async () => {
-		// demo/main.ts 是脚本（顶层查 DOM + 绑监听器）——先建 DOM 再 import（仅一次）
-		document.body.innerHTML = `
-		<select id="lang">
-			<option value="pd" selected>pd</option>
-			<option value="md">md</option>
-			<option value="xml">xml</option>
-			<option value="json">json</option>
-			<option value="yaml">yaml</option>
-		</select>
-		<button id="fmt">格式化（pd）</button>
-		<button id="transform">转换 JSON ↔ PD</button>
-		<span id="status"></span>
-		<div id="editor"></div>
+function setup() {
+	document.body.innerHTML = `
+	<select id="lang">
+		<option value="pd" selected>pd</option>
+		<option value="json">json</option>
+		<option value="md">md</option>
+		<option value="yaml">yaml</option>
+		<option value="xml">xml</option>
+	</select>
+	<button id="format"></button>
+	<button id="transform"></button>
+	<button id="copy"></button>
+	<button id="clear"></button>
+	<button id="undo"></button>
+	<button id="redo"></button>
+	<span id="count"></span>
+	<span id="status"></span>
+	<pd-editor id="main-editor"></pd-editor>
 	`;
-		await import("../demo/main");
-		const win = window as unknown as { pdEditor: { getValue: () => string; setValue: (v: string) => void } };
-		const s = document.querySelector<HTMLSpanElement>("#status")!;
-		const fmt = document.querySelector<HTMLButtonElement>("#fmt")!;
-		const transform = document.querySelector<HTMLButtonElement>("#transform")!;
-		const langSel = document.querySelector<HTMLSelectElement>("#lang")!;
+	mountDemo();
+	const main = document.querySelector<PdEditorElement>("#main-editor")!;
+	const status = document.querySelector<HTMLElement>("#status")!;
+	const count = document.querySelector<HTMLElement>("#count")!;
+	const lang = document.querySelector<HTMLSelectElement>("#lang")!;
+	const button = (id: string) =>
+		document.querySelector<HTMLButtonElement>(`#${id}`)!;
+	return { main, status, count, lang, button };
+}
 
-		// 多段 pd → 报错列段名
-		transform.click();
-		expect(s.textContent).toContain("2 个 pd 段");
-		expect(s.textContent).toContain("基础设定");
+describe("demo playground 冒烟", () => {
+	it("格式化 + 单段 PD↔JSON + 多段报错 + 语言/计数", () => {
+		const { main, status, count, lang, button } = setup();
+		expect(main.editor).not.toBeNull();
+		expect(count.textContent).toContain("字符");
 
-		// 单段 pd → json
-		win.pdEditor.setValue("角色: 资深工程师\n任务: 实现防抖搜索框");
-		transform.click();
-		expect(s.textContent).toContain("已转换 JSON");
-		const json = win.pdEditor.getValue();
-		expect(json).toContain('"任务": "实现防抖搜索框"');
-		expect(langSel.value).toBe("json");
+		// 格式化：全角冒号 → 半角、冒号后空格
+		main.value = "任务：实现防抖搜索框\n影像风格:真人实拍";
+		button("format").click();
+		expect(main.value).toContain("任务: 实现防抖搜索框");
+		expect(main.value).toContain("影像风格: 真人实拍");
+		expect(status.textContent).toBe("已格式化");
 
-		// json → pd（回环）
-		transform.click();
-		expect(s.textContent).toContain("已转换 PD");
-		expect(win.pdEditor.getValue()).toContain("任务: 实现防抖搜索框");
-		expect(langSel.value).toBe("pd");
+		// 单段 pd → json → pd 回环
+		main.value = "角色: 资深工程师\n任务: 实现防抖搜索框";
+		lang.value = "pd";
+		lang.dispatchEvent(new Event("change"));
+		button("transform").click();
+		expect(status.textContent).toBe("已转换 JSON");
+		expect(lang.value).toBe("json");
+		expect(main.value).toContain('"任务": "实现防抖搜索框"');
+		button("transform").click();
+		expect(status.textContent).toBe("已转换 PD");
+		expect(lang.value).toBe("pd");
 
-		// 再来回一次：结果与原 json 一致（键值对文本完整回环）
-		transform.click();
-		expect(win.pdEditor.getValue()).toBe(json);
+		// 多段 pd：转换报错列出段名
+		main.value = "//!pd 基础设定\na: 1\n//!pd 主任务\nb: 2";
+		button("transform").click();
+		expect(status.textContent).toContain("2 个 pd 段");
+		expect(status.textContent).toContain("基础设定");
 
-		// fmt：非 pd 语言提示
-		langSel.value = "md";
-		langSel.dispatchEvent(new Event("change"));
-		fmt.click();
-		expect(s.textContent).toContain("仅 pd 语法支持格式化");
+		// 非 pd 语言：格式化给出提示
+		lang.value = "md";
+		lang.dispatchEvent(new Event("change"));
+		button("format").click();
+		expect(status.textContent).toContain("只支持 pd");
 
-		// fmt：pd 语言真正格式化（全角冒号 → 半角、冒号后空格）
-		langSel.value = "pd";
-		langSel.dispatchEvent(new Event("change"));
-		win.pdEditor.setValue("任务：实现防抖搜索框\n影像风格:真人实拍");
-		fmt.click();
-		expect(win.pdEditor.getValue()).toContain("任务: 实现防抖搜索框");
-		expect(win.pdEditor.getValue()).toContain("影像风格: 真人实拍");
-
-		// md/xml/yaml 语言点转换 → 提示不支持
-		langSel.value = "xml";
-		langSel.dispatchEvent(new Event("change"));
-		transform.click();
-		expect(s.textContent).toContain("仅 pd / json 语法支持相互转换");
+		// 计数随输入更新
+		main.value = "a: 1\nb: 2";
+		main.dispatchEvent(
+			new CustomEvent("pd-input", { detail: { value: main.value } }),
+		);
+		expect(count.textContent).toContain("2 行");
 	});
 });
