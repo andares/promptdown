@@ -1,6 +1,6 @@
 {
   "name": "@andares/pdeditor",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "低 UI prompt 输入框：headless 核心 + <pd-editor> 自定义元素 + React 包装；pd/md/xml/json/yaml 高亮、滚动同步、IME、撤销，主题全走 CSS 变量",
   "type": "module",
   "license": "MIT",
