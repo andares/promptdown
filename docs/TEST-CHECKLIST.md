@@ -3,7 +3,7 @@
 > 面向：一次含 **共享语义包迁移（@andares/pdfoundation）+ editor 语义导出 + 扩展 esbuild 打包** 的版本发布。
 > 自动门禁（typecheck/test/build/VSIX 内容）已覆盖的部分仍建议人工冒烟确认，尤其是标 ⚠️ 的**本轮真正改动的路径**。
 >
-> 测前基线：`pnpm typecheck && pnpm test`（主包 26）·`pnpm --filter @andares/pdfoundation test`（178）·`pnpm --filter @andares/pdeditor test`（53）全部通过。
+> 测前基线：`pnpm typecheck:all && pnpm test:all`（主包 26 · foundation 180 · editor 82，共 288）全部通过。
 
 ---
 
@@ -45,8 +45,16 @@
 
 > ⚠️ 双入口 re-export `format / jsonToPdText / pdToJsonText`（+ 自研 `highlightPd`），**external + dependencies** `@andares/pdfoundation`，产物零体积、不内联（依赖由消费方 npm 自动安装）。
 
-- [ ] `pnpm --filter @andares/pdeditor build:editor`（lib 双入口 + demo 重建）无报错
-- [ ] `pnpm --filter @andares/pdeditor test`（53 用例，含 bundle-guard：pd 入口仅豁免 `@andares/pdfoundation` 一个 bare import）
+- [ ] `pnpm --filter @andares/pdeditor build:editor`（lib 五入口 + 单文件 demo）无报错
+- [ ] `pnpm --filter @andares/pdeditor test`（82 用例：工厂/高亮/元素/React/demo 冒烟 + bundle-guard：各入口仅豁免 `@andares/pdfoundation`（react 入口另豁免 `react`））
+- [ ] **元素层冒烟**（浏览器）：
+  - shadow 默认：字体/字号继承宿主；覆盖层 `pre`／行号／placeholder 均 `aria-hidden`；`aria-label` 转发到 textarea
+  - 固定高度：宿主 `height:120px` + 元素 `height:100%` → textarea 内滚，高亮层 `scrollTop` 同步；`max-height` 同理
+  - 空值 placeholder 可见；输入后隐藏；`Tab` 默认缩进，`Escape` 后下一次 Tab 移焦
+  - `shadow="false"`：light DOM、宿主可直接写 `.pd-key`，head 中仅注入一次 scoped 主题
+  - 元素事件：`pd-input` / `pd-change` / `pd-focus` / `pd-blur` / `pd-ready`（bubbles + composed）
+- [ ] **React 包装**：`/react` 入口受控 `value` 回写不打断输入；`defaultValue` 初始化；`highlight` 函数经 property 注入
+- [ ] **单文件 demo**：`build:demo` 产物 `demo-dist/index.html` 无 `type="module"`/外部资源，双击（file://）可打开；页面内“运行自检”全绿
 - [ ] **消费验证（node 直查 dist）**：
 
   ```bash
@@ -54,6 +62,10 @@
     ['createPdEditor','highlightPd','format','pdToJsonText','jsonToPdText']\
     .forEach(k=>console.log(k, typeof m[k]))"
   # 五项全为 function；format('任务：x')→'任务: x' 说明语义包已解析
+  node -e "const m=require('./packages/editor/dist/element.cjs'); \
+    console.log(typeof m.definePdEditor)"   # function（Node 下调用安全返回 null）
+  node -e "const m=require('./packages/editor/dist/react.cjs'); \
+    console.log(typeof m.PdEditor)"         # function（需要宿主装 react）
   ```
 - [ ] 打开 `demo-dist/index.html`（file:// 直接开）：
   - 格式化按钮：全角冒号 → 半角、`已是最佳格式` 幂等提示

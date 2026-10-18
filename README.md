@@ -345,21 +345,22 @@ F6 = ["select_all", "yank"]       # 一键全选复制全文到系统剪贴板�
 
 ## 🧩 多端一致性（语法规则同步状态）
 
-pd 语法在四端实现，语义以 **TS 核心**（`packages/pdfoundation/` 共享包 @andares/pdfoundation，解析/转换/格式化的唯一事实）为准，其余各端为**显示层**：
+pd 语法在五端实现，语义以 **TS 核心**（`packages/pdfoundation/` 共享包 @andares/pdfoundation，解析/转换/格式化的唯一事实）为准，其余各端为**显示层**：
 
-| 规则 | TS 核心 | VSCode（TextMate） | Helix（tree-sitter） |
-| --- | --- | --- | --- |
-| 严格键值判定（`a : b`/`a:b` 非键值） | ✅ | ✅ | ✅ |
-| `:-`/`：-` 整行转义 | ✅ | ✅ | ✅ |
-| 行内代码内冒号不参与键值/转义判定 | ✅ | ✅ | ✅（0.8 同步） |
-| 行内代码整体漂色 | ✅（语义） | ✅ | ⚠️ 仅语义豁免，无漂色 |
-| `:-` 行内代码内不触发整行转义 | ✅ | ⚠️ 保守（代码内 `:-` 也整行不识别键值） | ✅ |
-| SECTION 整行锚定（`//!pd 名 字` 非段标记） | ✅ | ✅ | ⚠️ 降级：前缀匹配 |
-| SEPARATOR 整行锚定（`---x` 非分隔线） | ✅ | ✅ | ⚠️ 降级：`---` 前缀即匹配 |
-| 引用前后空格约束（` :name `） | ✅ | ✅ | ⚠️ 降级：tree-sitter 正则无 lookahead |
-| 未闭合反引号按普通字符 | ✅ | ✅ | ⚠️ 降级：近似处理 |
-| ``` 围栏内原样/不切段/不展开引用 | ✅ | ✅（高亮） | ✅ |
-| 寻址/引用解析（%N、%% 转义、先到先得） | ✅ | —（无寻址概念） | — |
+| 规则 | TS 核心 | VSCode（TextMate） | Helix（tree-sitter） | Web 组件（pdeditor） |
+| --- | --- | --- | --- | --- |
+| 严格键值判定（`a : b`/`a:b` 非键值） | ✅ | ✅ | ✅ | ✅ |
+| `:-`/`：-` 整行转义 | ✅ | ✅ | ✅ | ✅ |
+| 行内代码内冒号不参与键值/转义判定 | ✅ | ✅ | ✅（0.8 同步） | ✅（直接复用 foundation） |
+| 行内代码整体漂色 | ✅（语义） | ✅ | ⚠️ 仅语义豁免，无漂色 | ✅ |
+| `:-` 行内代码内不触发整行转义 | ✅ | ⚠️ 保守（代码内 `:-` 也整行不识别键值） | ✅ | ✅ |
+| SECTION 整行锚定（`//!pd 名 字` 非段标记） | ✅ | ✅ | ⚠️ 降级：前缀匹配 | ✅ |
+| SEPARATOR 整行锚定（`---x` 非分隔线） | ✅ | ✅ | ⚠️ 降级：`---` 前缀即匹配 | ✅ |
+| 引用前后空格约束（` :name `） | ✅ | ✅ | ⚠️ 降级：tree-sitter 正则无 lookahead | ✅ |
+| 未闭合反引号按普通字符 | ✅ | ✅ | ⚠️ 降级：近似处理 | ✅ |
+| ``` 围栏内原样/不切段/不展开引用 | ✅ | ✅（高亮） | ✅ | ✅ |
+| 寻址/引用解析（%N、%% 转义、先到先得） | ✅ | —（无寻址概念） | — | — |
+
 
 **降级说明**（tree-sitter 外部 scanner 无法回退已消费字符 + 正则引擎不支持 lookahead，严格判定的失败分支会导致行内容丢失/误判；宽容前缀匹配在显示层更安全）：
 
@@ -368,6 +369,7 @@ pd 语法在四端实现，语义以 **TS 核心**（`packages/pdfoundation/` �
 - 未闭合反引号行（`` `a: b ``）在 Helix 按非键值显示（TS 核心按普通文本，可作键名）
 
 > 以上差异均为**高亮显示层**差异，不影响解析/转换结果（语义以 TS 核心为准）。
+pdeditor 直接复用 foundation 的行内工具（`splitInlineCode` / `matchKeyValue` / `findKeyValueSeparator`），没有额外降级；值不单独上色（与 TextMate 一致）。
 
 ## 🔒 API 与稳定性（1.0 起冻结）
 
@@ -377,7 +379,7 @@ promptdown 由三个 npm 包组成，1.0 后以下公共面**冻结**（不可�
 | --- | --- |
 | `@andares/promptdown` | CLI 行为（`pdtransform` / `pdcompile` / `pdformat` / `--version`）、VSCode 贡献点（命令、语言 id `promptdown`、配置 `promptdown.autoDetect`、格式化程序、Tab/回车编辑行为）。**不导出 JS 语义 API**（已移至 foundation） |
 | `@andares/pdfoundation` | 语义 API：`format` / `pdToJsonText` / `jsonToPdText` / `compilePdText` / `compileSections` / `detectTransformKind` / `splitSections` / `nameSections` / `resolveSection` 等（完整清单见 [1.0 规划](docs/ROADMAP-1.0.md)） |
-| `@andares/pdeditor` | 组件 API：`createPdEditor` 与 `PdEditorOptions` 全部键；`/pd` 入口另含 `highlightPd`；两入口 re-export 语义 API |
+| `@andares/pdeditor` | 组件 API：`createPdEditor` 与 `PdEditorOptions` 现有键；`highlightPd` / `prismHighlighter`；`<pd-editor>`（属性/事件/方法）、`definePdEditor`、React 包装。新增键/入口为加法，不破坏既有调用 |
 
 - **语法规范**：`docs/SPEC.md` 冻结——行类型、section 寻址、引用（含循环静默擦除）、格式化与转义/豁免矩阵；1.0 后只做非破坏性补充
 - **版本策略**：语义化版本；`@andares/pdfoundation` 与主包**同号绑定**（每次 `release-all` 一起发）；`@andares/pdeditor` 独立版本线
@@ -399,18 +401,43 @@ promptdown 由三个 npm 包组成，1.0 后以下公共面**冻结**（不可�
 
 安装到 AI 的 skill 目录即可（如 `~/.pi/agent/skills/` 或项目 `.agents/skills/`，`pd-author/` 目录整体复制为独立 skill）。
 
+## 🖥️ Web 输入框组件
+
+[@andares/pdeditor](https://github.com/andares/promptdown/tree/master/packages/editor) 是 **低 UI 提示词输入框**：核心只负责文本、光标与高亮，边框/背景/工具栏/发送按钮由宿主决定。三种用法：
+
+- 原生：`import "@andares/pdeditor/element/auto"` → `<pd-editor language="pd" placeholder="…"></pd-editor>`
+- 工厂：`createPdEditor(el, options)`（无自定义元素，自己控制 DOM）
+- React：`import { PdEditor } from "@andares/pdeditor/react"`
+
+```html
+<pd-editor id="prompt" language="pd" placeholder="描述你想让模型做的事…"></pd-editor>
+<script type="module">
+  import "@andares/pdeditor/element/auto";
+  const el = document.querySelector("#prompt");
+  el.addEventListener("pd-input", (e) => console.log(e.detail.value));
+</script>
+```
+
+- 入口：`.`（全量，含 Prism）/ `./pd`（pd-only ~5.5 kB gzip）/ `./element`（~9.5 kB gzip，不含 Prism）/ `./element/auto` / `./react`
+- 低 UI：字体/字号/颜色继承宿主；主题全走 CSS 变量（`--pd-token-*` / `--pd-focus-ring` …）；`shadow="false"` 可切 light DOM 直接写 `.pd-key`
+- 尺寸：auto-grow；宿主给 `height` / `max-height` 时自动内滚并同步高亮层
+- Demo：`pnpm --filter @andares/pdeditor build:demo` → 单文件 `demo-dist/index.html`（双击即可打开）
+
 ## 🛠️ 开发
 
-- **Web 输入框组件**：[packages/editor/](https://github.com/andares/promptdown/tree/master/packages/editor)（npm 包 @andares/pdeditor）——headless 提示词输入框（pd/md/xml/json/yaml 高亮），基于 Yace；含 pd-only 精简入口（`@andares/pdeditor/pd`，不含 Prism，~17 kB），该入口另 re-export 共享语义包（`format` / `jsonToPdText` / `pdToJsonText` / `highlightPd`）；`pnpm --filter @andares/pdeditor dev` 起 demo
+- **Web 输入框组件**：[@andares/pdeditor](https://github.com/andares/promptdown/tree/master/packages/editor)——低 UI 核心（自研 overlay 引擎，无 Yace）+ `<pd-editor>` + React 包装；全量 / pd-only / element / element-auto / react 五个入口；`pnpm --filter @andares/pdeditor dev` 起 demo，`build:demo` 生成双击可开的单文件
 - **性能基准**：`pnpm perf`（10 副本样本 2099 行/150 段全链路基准）；`pnpm perf:gen [份数]` 重新生成样本（`perf/generated/` 不入库）
 - **1.0 路线**：见 [`docs/ROADMAP-1.0.md`](docs/ROADMAP-1.0.md)（API 冻结声明 + 全端对齐确认 + 发布节奏）
 
 ```bash
 pnpm install
-pnpm typecheck   # 类型检查
-pnpm test        # node:test（壳层 + CLI 集成；语义规则 178 用例在 packages/pdfoundation）
-pnpm build       # tsc → dist/
-pnpm package     # 以 --no-dependencies 打包 .vsix
+pnpm typecheck:all   # 三包类型检查（foundation + editor + 主包）
+pnpm test:all        # 三包测试（26 主包 + 180 foundation + 82 editor）
+pnpm build:all       # foundation + 主包 + editor（含单文件 demo）
+pnpm typecheck       # 只跑主包（兼容旧命令）
+pnpm test            # 只跑主包（兼容旧命令）
+pnpm build           # 只跑主包（会先构建 foundation）
+pnpm package         # 以 --no-dependencies 打包 .vsix
 ```
 
 ### 发布
@@ -438,7 +465,7 @@ promptdown/
 ├── src/enter.ts         # 回车清子项标记（扩展专用）
 ├── src/version.ts       # CLI 通用 --version
 ├── packages/pdfoundation/  # ⭐ 共享语义核心 @andares/pdfoundation（parser/format/转换 + 语义测试与 fixtures）
-├── packages/editor/     # headless 输入框组件 @andares/pdeditor
+├── packages/editor/     # 低 UI 输入框 @andares/pdeditor（工厂 + <pd-editor> + React 包装）
 ├── syntaxes/            # TextMate 语法高亮
 ├── docs/SPEC.md         # ⭐ 语法规范（唯一事实来源）
 ├── skill/               # AI skill（容器：promptdown/ 解析版 + pd-author/ 作者版）

@@ -62,7 +62,7 @@ packages/pdfoundation/      # 共享语义核心 @andares/pdfoundation（零运�
     ├── toJson.ts           # 树 → JSON（单条折叠：inline 且无子键 → 字符串）
     └── expand.ts           # 段切分（围栏感知）+ nameSections/resolveSection 寻址 + `:refname`/`:%N` 引用展开
 
-packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
+packages/editor/            # 低 UI 输入框 @andares/pdeditor（工厂 + <pd-editor> + React，见下节）
 ```
 
 **`docs/SPEC.md` 是语法规范的唯一事实来源**——grammar、parser、skill 全部以它为准。
@@ -84,7 +84,7 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 - **引用**：` :refname ` 或 ` :%序号 `（前后必须带空格），编译期内联展开；`%N` 序号引用匿名段也可用；多段 `//!pd <name>` 混排；``` 围栏内与行内代码内不展开
 - **section 寻址**：`%N` = 全局 1-based 序号；否则字符模式匹配 `//!pd <name>`（数字命名也是字符）；`%` 开头的段名转义 `%%`；隐式段（无 `//!pd`）= 文件主名；裸 `//!pd` 匿名段只能 `%N`；跨文件重名先到先得
 - **行内代码**（`` ` ``）：配对整体字串，不支持换行；内部 `:`/`：`/`-` 不参与键值/序列/`:-` 转义/引用判定，format 与 jsonToPd 转义均豁免
-- **多端一致性**：TextMate 与 tree-sitter 为显示层（语义以 TS 核心为准）；tree-sitter 有降级项（SECTION/SEPARATOR 整行锚定、ref 前后空格约束、行内代码漂色缺失——外部 scanner 无法回退字符 + 正则无 lookahead），差异表见 README「多端一致性」；语法改动需同步四端 + 更新差异表
+- **多端一致性**：TextMate / tree-sitter / pdeditor 为显示层（语义以 TS 核心为准）；tree-sitter 有降级项（SECTION/SEPARATOR 整行锚定、ref 前后空格约束、行内代码漂色缺失——外部 scanner 无法回退字符 + 正则无 lookahead），差异表见 README「多端一致性」；语法改动需同步各显示端 + 更新差异表
 - 顶层 `-` 不允许缩进（编译报错；format 时自动修正）
 - 对换行极不敏感：空行基本无视
 
@@ -97,7 +97,7 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 
 1. 参数校验：`patch | minor | major` 恰好一个；`--dry-run` 只预览；`release`/`all` 旧形态与非法参数被拦截提示
 2. **sync**：未提交改动 → 展示清单 + `git add -A` + commit `chore: sync uncommitted changes before release`；本地领先远端 → `git push origin <分支>`（失败中止）；本地落后远端 → 中止（提示 `git pull --rebase`）；都没有 → 跳过不推。保证 release commit 与 tag 建立在线上最新代码上，不会出现“文件没提交但 tag 已打”
-3. 门禁：typecheck + test + build（含 foundation 的 test），失败即中止
+3. 门禁：typecheck + test + build（含 foundation 与 editor 的 typecheck/test/build），失败即中止
 4. bump 主包 `package.json` version + **同步 bump `packages/pdfoundation/package.json` version（同号）**（2 空格缩进 + 尾换行）
 5. **CHANGELOG 归档**：`CHANGELOG.dev.md`（开发期变更日志，见下节）存在且有条目 → 条目归档为 `CHANGELOG.md` 顶部 `## X.Y.Z (YYYY-MM-DD)` 章节（插到最新章节之前；无已有章节时锚 `# Changelog` 标题行），删除 dev 文件，两者随 release commit 进 git；文件不存在或无条目 → 黄字提示跳过（纯依赖/内部提交可无记录）；`CHANGELOG.md` 缺标题锚点 → 红字中止
 6. `git commit -m "chore: release vX.Y.Z"`，然后调用 `scripts/tag-current.mjs` 打 tag（检测已存在 → 不重复打，指向 release commit）
@@ -133,29 +133,28 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 - **构建**：vite lib ESM/CJS 双格式（index.js / index.cjs）+ tsc d.ts；`sideEffects:false` 可树摇；零依赖（无需 external）
 - **消费**：主包用 CJS `require`（`moduleResolution: node` 靠顶层 `main`/`types` 兜底解析，非 exports）；Web 端经 editor 双入口 re-export（vite external + **dependencies**）或直接 import
 - **发布**：随主包 release-all 一起发——版本号与主包**同号绑定**（publish.mjs bump 时同步写入），顺序固定：先发 foundation 再发主包；主包 dependencies 用 `workspace:^`，pnpm 发布时自动改写为实际版本
-- **测试**：语义测试随包（tsx --test + fixtures，178 用例）；CLI 集成测试（spawn compile-cli）留在主包 test/
+- **测试**：语义测试随包（tsx --test + fixtures，180 用例）；CLI 集成测试（spawn compile-cli）留在主包 test/
 
-## Web 输入框组件（@andares/pdeditor，headless 优先）
+## Web 输入框组件（@andares/pdeditor，低 UI 优先）
 
-### 当前状态（v0.4.x，见 packages/editor/）
+### 当前状态（v0.5.x，见 packages/editor/）
 
-基于 **Yace**（<https://github.com/petersolopov/yace，~2KB、零依赖、BYO> highlighter）的 **headless 提示词输入框** `@andares/pdeditor`：
+**低 UI 提示词输入框**：自研 overlay 引擎（已移除 Yace），三种用法——工厂 `createPdEditor` / 自定义元素 `<pd-editor>` / React `<PdEditor>`。
 
-- **形态**：纯背后控制，只渲染输入框内容 + 提供 API（`createPdEditor`，含 `setLanguage/setValue/getValue/destroy`）；无 UI chrome，核心维护 textarea/pre 覆盖层排版不变量，外部定义容器外观与 token 配色
-- **语言切换是 API 行为**（非 UI 切换器）：pd / md / xml / json / yaml（Prism 提供后四种）
-- **不是富文本**：pd 是纯代码文本，要精确不要样式——高亮服务于精确；排除富文本引擎（ProseMirror/Lexical/Slate）与 CM6/Monaco 本体
-- **不依赖主包**（主包 = VSCode 扩展，main 指向 dist/extension.js，浏览器不可 import）：pd 高亮 tokenizer 仍在组件内自研（语义与共享包 lexer 一致，见 `packages/editor/src/inline.ts`）；语义功能改走**共享语义包 @andares/pdfoundation**（见上节），不再直引主包源码
-- **语义 API：双入口 re-export @andares/pdfoundation**：两个入口均导出 `format` / `jsonToPdText` / `pdToJsonText`；`/pd` 入口另含自研 `highlightPd`（供外部自定义渲染/复用）。pdfoundation 声明在 **dependencies**（产物直接外部 import 的运行时依赖必须自动安装；vite external 不内联、零产物体积）——**勿改回 peerDependencies**（peer 仅用于真正需要宿主注入/共享实例的包）
-- **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 测试 53 用例）
-- **demo 页**：`packages/editor/demo/`（vite dev 验证高亮/语言切换/中文 IME/格式化/双向转换——demo 从共享包引语义，演示消费方接入姿势；`test/demo-smoke.test.ts` 防回归）
+- **形态**：核心只渲染文本/光标/高亮；**不修改挂载点样式**；字体/字号/颜色默认 inherit，主题全走 CSS 变量；`createPdEditor` API 保持兼容（新增可选键）
+- **引擎**：透明 textarea + 高亮 pre + 可选行号层；`scrollbar-gutter: stable` 保证两层宽度一致；auto-grow（pre 在文档流）↔ 内滚（宿主 `height`/`max-height`）自动切换，`scroll` 事件同步覆盖层；`ResizeObserver` 处理宿主尺寸；输入热路径不做强制布局读取。排版不变量见 editor README
+- **入口**：`.`（全量，含 Prism）/ `./pd`（pd-only）/ `./element`（`<pd-editor>`，不含 Prism）/ `./element/auto`（import 即注册）/ `./react`（React optional peer）。元素默认只带 pd tokenizer；需要 md/json/yaml/xml 时由宿主注入 `highlight`（主入口导出 `prismHighlighter`）
+- **a11y**：覆盖层 `aria-hidden`、label 转发、焦点环、`Tab` 可配（`indent` / `focus`，indent 下 `Escape` 释放下一次 Tab）、placeholder 覆盖层（不依赖原生 placeholder）
+- **语义单源**：pd tokenizer 在组件内（`pd-highlight.ts`），行内判定直接复用 foundation 导出（`splitInlineCode` / `matchKeyValue` / `findKeyValueSeparator`），不再保留副本
+- **发布**：独立 workspace 包 `packages/editor/` → npm `@andares/pdeditor`（vite lib mode：ESM/CJS + d.ts；vitest + jsdom 82 用例）；`foundation` 在 dependencies（external + 自动安装）
+- **demo**：`demo/index.html` + `demo/app.ts`；`pnpm --filter @andares/pdeditor build:demo` 用 esbuild 产出**单文件** `demo-dist/index.html`（file:// 双击可用，内联 IIFE；含低 UI 嵌入示例、基础工具栏 UI、框架用法、浏览器几何自检）；`dev` 仍用 vite 热更新
 - **变更记录**：`packages/editor/CHANGELOG.md`（独立版本线；开发期条目写 `packages/editor/CHANGELOG.dev.md`，`pnpm release-editor` 自动归档）
-- 插件（yace 内置）：Tab 缩进 + 续行缩进默认启用
 
-### 未来可选方向（不在本期实现）
+### 未来可选方向
 
-- **成品输入框**（headless 核心 + UI 层，**不着急做**）：格式切换器（复用 detectTransformKind）、Ctrl+G 放大模式（大输入切 CM6 专用编辑器）、历史记录（localStorage/IndexedDB）、工具栏（段大纲等）
-- 主题系统（CSS 变量，参考 synesthesia）
-- 移动端/触屏适配、协同（Yjs）
+- 成品 UI 层（格式切换器 / Ctrl+G 放大模式 / 历史记录 / 工具栏）——核心已提供 element + 事件，UI 层按宿主需求自建
+- 移动端/触屏专项验证、协同（Yjs）
+- Helix 结构升级（folds / fence injection 需要 grammar 从平铺行改成块结构；当前只做高亮 + 缩进）
 
 ## Git 权限边界（强约束）
 
@@ -172,7 +171,7 @@ packages/editor/            # 输入框组件 @andares/pdeditor（见下节）
 - 语法规则改动必须同步：`docs/SPEC.md` → parser → `syntaxes/pd.tmLanguage.json` → `skill/promptdown/SKILL.md` → fixtures
 - 格式化规则（`packages/pdfoundation/src/format.ts`）与 SPEC 的「格式化」章节保持一致：全角冒号→半角、键值冒号后单空格、引用前后空格、顶层 `-` 缩进修正、行尾空白；VSCode 格式化程序（src/extension.ts）与 CLI 共用同一 format 函数
 - **格式化**：遵循 biome 默认风格（tab 缩进）。保存/提交前保持与现有文件一致，避免格式噪音 diff
-- 发布前必须跑 `pnpm typecheck && pnpm test`，全部通过才可 `pnpm release-all` / `pnpm release-editor`
-- **editor 功能改动后必须重建 demo**：`packages/editor/` 的 `src/` 或 `demo/` 有任何改动后，必须重新构建预构建 demo——`pnpm --filter @andares/pdeditor build:demo`（或一步到位 `build:editor` = lib build + demo build），保证 `demo-dist/` 与源码同步（demo-dist 是本地产物，gitignored 不入库，但用户直接打开它查看效果，旧产物会误导）
+- 发布前必须跑 `pnpm typecheck:all && pnpm test:all`，全部通过才可 `pnpm release-all` / `pnpm release-editor`（release-all 门禁已含 foundation + editor）
+- **editor 功能改动后必须重建 demo**：`packages/editor/` 的 `src/` 或 `demo/` 有任何改动后，必须重新构建单文件 demo——`pnpm --filter @andares/pdeditor build:demo`（或一步到位 `build:editor` = lib build + demo build），保证 `demo-dist/` 与源码同步（demo-dist 是本地产物，gitignored 不入库，但用户直接打开它查看效果，旧产物会误导）
 - `.npmignore` 控制发布内容（pnpm 复用 npm 的发布文件机制，勿删）；新增发布文件记得检查它
 - **计划/方案文件为一次性任务产物**：完成后删除，不留仓库根目录（完整过程轨迹保留在 git 历史与 commit message）；需要常驻的设计文档放 `docs/`
