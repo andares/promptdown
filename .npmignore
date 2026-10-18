@@ -7,6 +7,14 @@ tmp/
 *.vsix
 *.tgz
 .git/
+.github/
+.pi-subagents/
+.pi-lens.json
+.gitleaks.toml
+AGENTS.md
+CHANGELOG.dev.md
+docs/
+icons/concepts/
 PLAN.md
 plans/
 .firecrawl/
@@ -19,5 +27,7 @@ pnpm-workspace.yaml
 !scripts/
 scripts/publish.mjs
 scripts/tag-current.mjs
+scripts/bundle-extension.mjs
+scripts/publish-editor.mjs
 perf/
 packages/
