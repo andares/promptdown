@@ -67,33 +67,43 @@ function helixConfigDir() {
 function writeLanguagesToml(configDir) {
 	const path = join(configDir, "languages.toml");
 	const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
-	// grammar 块存在且路径一致 → 跳过；路径不同 → 更新（repo ↔ npm 包切换场景）
+	// TOML 基本字符串里反斜杠是转义符：Windows 路径统一写成 /（helix 接受）
+	const grammarPath = GRAMMAR_DIR.replace(/\\/g, "/");
+	// 宽松匹配 grammar 块（容忍空白/换行差异）；只检查 promptdown 自己的块
 	const grammarRe =
-		/\[\[grammar\]\]\nname = "promptdown"\nsource = \{ path = "([^"]*)" \}/;
+		/\[\[grammar\]\][^\[]*?name\s*=\s*"promptdown"[^\[]*?source\s*=\s*\{\s*path\s*=\s*"([^"]*)"\s*\}/s;
 	const m = existing.match(grammarRe);
-	if (m && m[1] === GRAMMAR_DIR) {
+	if (m && m[1] === grammarPath) {
 		console.log(
 			`${C.dim}languages.toml 已有 promptdown 条目且路径一致，跳过${C.reset}`,
 		);
 		return;
 	}
-	if (m && m[1] !== GRAMMAR_DIR) {
+	const backup = () => {
+		if (!existing) return;
+		const bak = `${path}.bak`;
+		if (!existsSync(bak)) writeFileSync(bak, existing);
+		console.log(`${C.dim}已备份原配置 → ${bak}${C.reset}`);
+	};
+	if (m && m[1] !== grammarPath) {
+		backup();
 		const updated = existing.replace(
 			grammarRe,
-			`[[grammar]]\nname = "promptdown"\nsource = { path = "${GRAMMAR_DIR}" }`,
+			`[[grammar]]\nname = "promptdown"\nsource = { path = "${grammarPath}" }`,
 		);
 		writeFileSync(path, updated);
-		console.log(
-			`${C.green}已更新 source.path → ${GRAMMAR_DIR}${C.reset}`,
-		);
+		console.log(`${C.green}已更新 source.path → ${grammarPath}${C.reset}`);
 		return;
 	}
-	// 无 grammar 块：language 已有则只补 grammar，否则 language + grammar 一起追加
-	const hasLanguage = /name\s*=\s*"promptdown"/.test(existing);
+	// 无 grammar 块：language 已有则只补 grammar，否则 language + grammar 一起追加。
+	// 只匹配 [[language]] 块内的 name，避免误命中其它表的 name = "promptdown"。
+	const hasLanguage =
+		/\[\[language\]\][^\[]*?name\s*=\s*"promptdown"/s.test(existing);
 	const block =
 		(existing.trim() ? "\n" : "") +
 		(hasLanguage ? "" : `[[language]]\nname = "promptdown"\nscope = "source.pd"\nfile-types = ["pd"]\ncomment-tokens = ["//"]\n\n`) +
-		`[[grammar]]\nname = "promptdown"\nsource = { path = "${GRAMMAR_DIR}" }\n`;
+		`[[grammar]]\nname = "promptdown"\nsource = { path = "${grammarPath}" }\n`;
+	backup();
 	writeFileSync(path, existing + block);
 	console.log(`${C.green}已写入 ${path}${C.reset}`);
 }
