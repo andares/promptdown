@@ -1,0 +1,260 @@
+---
+name: publish
+
+# 发版语义：tag = 发版意图，本工作流 = 发版执行。
+#
+#   v{X.Y.Z}            → @andares/pdfoundation@{X.Y.Z}
+#                         + @andares/promptdown@{X.Y.Z}（同号）
+#   pdeditor-v{X.Y.Z}   → @andares/pdeditor@{X.Y.Z}（独立版本线）
+#
+# 本地 `pnpm release-all` / `pnpm release-editor` 只做门禁、版本、CHANGELOG、commit、tag，
+# 最后把 tag 推上来；registry 的写入发生在这里（OIDC trusted publishing：
+# 无 token、无 2FA、自动 provenance）。本地 npm token 只保留读取与应急 staging。
+on:
+  push:
+    tags: ['v*', 'pdeditor-v*']
+  # 重跑恢复入口：Actions → Run workflow，ref 必须选目标 tag。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # workflow_dispatch 可以手选分支；分支上没有版本校验的意义，直接失败而不是静默跳过。
+  guard:
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::publish 必须从 tag 运行（Run workflow 时 ref 选目标 tag）"
+          exit 1
+
+  # 主包 + foundation：版本同号强绑定，先发 foundation 再发主包。
+  main:
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # trusted publishing（OIDC）；仅发布 job 需要
+    timeout-minutes: 30
+    steps:
+      # actions 固定到 commit SHA（可供应链安全审计）；括号里是等价 tag，便于升级
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # 需要完整历史来判断 tag 是否在默认分支上
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+          # 故意不开 cache：发布 job 带 id-token: write，恢复一份自己无法校验的
+          # pnpm store 等于把 tarball 内容交给缓存投毒（zizmor: cache-poisoning）。
+
+      # Node 22 自带 npm 10；trusted publishing 需要 npm >= 11.5.1（否则 404）。
+      # 钉具体版本而不是 latest：发布链路要可复现。
+      - name: Upgrade npm (trusted publishing needs >= 11.5.1)
+        run: npm install -g npm@11.21.2
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # 与 CI 完全同序：先构建再校验——三包的 typecheck/test 都经 foundation 的
+      # dist 解析类型与运行时，全新 clone 没有 dist 时直接 typecheck 会误报。
+      - name: Build（foundation → 主包 → editor + 单文件 demo）
+        run: pnpm build:all
+
+      - name: Typecheck（三包）
+        run: pnpm typecheck:all
+
+      - name: Test（三包）
+        run: pnpm test:all
+
+      - name: Package contents（npm tarball 白名单）
+        run: |
+          npm pack --dry-run
+          (cd packages/pdfoundation && npm pack --dry-run)
+
+      - name: Check tag matches package + foundation versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          main="$(node -p "require('./package.json').version")"
+          foundation="$(node -p \
+            "require('./packages/pdfoundation/package.json').version")"
+          if [ "$tag" != "$main" ] || [ "$tag" != "$foundation" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} 与版本不一致" \
+              "（主包 ${main}、foundation ${foundation}）"
+            exit 1
+          fi
+
+      - name: Check tag is on the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          remote="refs/remotes/origin/${DEFAULT_BRANCH}"
+          git fetch --no-tags origin "+refs/heads/${DEFAULT_BRANCH}:${remote}"
+          if ! git merge-base --is-ancestor HEAD "${remote}"; then
+            echo "::error::tag ${GITHUB_REF_NAME} 不在 ${DEFAULT_BRANCH} 上"
+            exit 1
+          fi
+
+      # pnpm 负责打包（唯一会把 package.json 里 `workspace:^` 改写为实际版本的工具），
+      # npm CLI 负责 OIDC 认证与 provenance 签署。分开两个目录，tarball 名不会撞。
+      - name: Pack（foundation + 主包）
+        run: |
+          mkdir -p "$RUNNER_TEMP/pkgs/foundation" "$RUNNER_TEMP/pkgs/main"
+          (cd packages/pdfoundation \
+            && pnpm pack --pack-destination "$RUNNER_TEMP/pkgs/foundation")
+          pnpm pack --pack-destination "$RUNNER_TEMP/pkgs/main"
+
+      - name: Verify tarballs (no workspace protocol leaks)
+        run: |
+          for tgz in "$RUNNER_TEMP"/pkgs/*/*.tgz; do
+            echo "== $tgz"
+            tar -tzf "$tgz" >/dev/null
+            if tar -xOzf "$tgz" package/package.json \
+              | grep -q 'workspace:'; then
+              echo "::error::$tgz 里仍有 workspace: 协议——消费方会装不上"
+              exit 1
+            fi
+          done
+
+      - name: Publish foundation, then main (provenance)
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          publish_one() {
+            local name="$1" tgz="$2"
+            if npm view "${name}@${tag}" version >/dev/null 2>&1; then
+              echo "::notice::${name}@${tag} 已在 npm（重跑恢复），跳过"
+              return 0
+            fi
+            npm publish "$tgz" --provenance --access public
+          }
+          foundation_tgz="$(ls "$RUNNER_TEMP"/pkgs/foundation/*.tgz)"
+          main_tgz="$(ls "$RUNNER_TEMP"/pkgs/main/*.tgz)"
+          publish_one "@andares/pdfoundation" "$foundation_tgz"
+          publish_one "@andares/promptdown" "$main_tgz"
+
+  # editor：独立版本线，独立 tag（pdeditor-vX.Y.Z）。
+  editor:
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'pdeditor-v')
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # trusted publishing（OIDC）；仅发布 job 需要
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Upgrade npm (trusted publishing needs >= 11.5.1)
+        run: npm install -g npm@11.21.2
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # editor 的类型与运行时要经 foundation 的 dist 解析；CI 里没有现成 dist。
+      - name: Build foundation（editor 的类型/运行时依赖）
+        run: pnpm --filter @andares/pdfoundation build
+
+      - name: Typecheck editor
+        run: pnpm --filter @andares/pdeditor typecheck
+
+      - name: Test editor
+        run: pnpm --filter @andares/pdeditor test
+
+      - name: Build editor
+        run: pnpm --filter @andares/pdeditor build
+
+      - name: Package contents（npm tarball 白名单）
+        run: (cd packages/editor && npm pack --dry-run)
+
+      - name: Check tag matches editor version
+        run: |
+          tag="${GITHUB_REF_NAME#pdeditor-v}"
+          editor="$(node -p \
+            "require('./packages/editor/package.json').version")"
+          if [ "$tag" != "$editor" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} 与 editor 版本 ${editor} 不一致"
+            exit 1
+          fi
+
+      # editor 的 workspace 依赖会在 pack 时改写为本地 foundation 版本；
+      # 手工推 tag / workflow_dispatch 也必须经过这道检查，不能只靠本地脚本。
+      - name: Check foundation dependency is already published
+        run: |
+          range="$(node -e '
+            const pkg = require("./packages/editor/package.json");
+            const range = pkg.dependencies?.["@andares/pdfoundation"] ?? "";
+            process.stdout.write(range);
+          ')"
+          if [ -z "$range" ]; then
+            exit 0
+          fi
+          foundation="$(node -p \
+            "require('./packages/pdfoundation/package.json').version")"
+          if ! npm view "@andares/pdfoundation@${foundation}" version \
+            >/dev/null; then
+            echo "::error::foundation ${foundation} 尚未在 npm" \
+              "——editor 会装不上"
+            exit 1
+          fi
+
+      - name: Check tag is on the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          remote="refs/remotes/origin/${DEFAULT_BRANCH}"
+          git fetch --no-tags origin "+refs/heads/${DEFAULT_BRANCH}:${remote}"
+          if ! git merge-base --is-ancestor HEAD "${remote}"; then
+            echo "::error::tag ${GITHUB_REF_NAME} 不在 ${DEFAULT_BRANCH} 上"
+            exit 1
+          fi
+
+      - name: Pack editor
+        run: |
+          mkdir -p "$RUNNER_TEMP/pkgs/editor"
+          (cd packages/editor \
+            && pnpm pack --pack-destination "$RUNNER_TEMP/pkgs/editor")
+
+      - name: Verify tarball (no workspace protocol leaks)
+        run: |
+          tgz="$(ls "$RUNNER_TEMP"/pkgs/editor/*.tgz)"
+          tar -tzf "$tgz" >/dev/null
+          if tar -xOzf "$tgz" package/package.json | grep -q 'workspace:'; then
+            echo "::error::$tgz 里仍有 workspace: 协议——消费方会装不上"
+            exit 1
+          fi
+
+      - name: Publish editor (provenance)
+        run: |
+          tag="${GITHUB_REF_NAME#pdeditor-v}"
+          tgz="$(ls "$RUNNER_TEMP"/pkgs/editor/*.tgz)"
+          if npm view "@andares/pdeditor@${tag}" version >/dev/null 2>&1; then
+            echo "::notice::@andares/pdeditor@${tag} 已在 npm（重跑恢复），跳过"
+          else
+            npm publish "$tgz" --provenance --access public
+          fi

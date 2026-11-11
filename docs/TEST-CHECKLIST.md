@@ -34,10 +34,10 @@
 > ⚠️ 主包新增 `dependencies: @andares/pdfoundation`（runtime 依赖）；foundation **版本与主包同号绑定**，随 release-all 一起发。
 
 - [ ] `npm pack --dry-run`（主包）→ 清单：**不含 packages/**、不含 node_modules、含 dist + skill ✅
-- [ ] **唯一主包发布入口**：`pnpm release-all patch` → 顺序固定 foundation（同号）→ 主包 → push/tag → vsce；editor 单独 `pnpm release-editor`（前置：foundation 目标版本已在 npm，否则消费方 ETARGET）；误敲 `pnpm release` 应被拦截提示
+- [ ] **唯一主包发布入口**：`pnpm release-all patch` → 门禁/bump/CHANGELOG/commit/tag → push `vX.Y.Z` → CI 按 foundation（同号）→ 主包顺序发布（OIDC + provenance）→ 本地确认 npm 后建 GitHub Release、发 vsce；editor 单独 `pnpm release-editor` → push `pdeditor-vX.Y.Z`（前置：foundation 目标版本已在 npm，否则消费方 ETARGET）；误敲 `pnpm release` 应被拦截提示
 - [ ] 临时目录 `npm i @andares/pdfoundation` → `import { format, pdToJsonText, jsonToPdText, compilePdText, splitInlineCode }` 全部可用且行为正确
 - [ ] 临时 vite 项目 `npm i @andares/pdeditor`（仅此一个包——foundation 作为 dependencies 应被自动带上，验证 node_modules 里存在 `@andares/pdfoundation`）→ 引 `/pd` 入口，`vite build` 验证：产物**无 Prism**、语义可 tree-shake、能跑
-- [ ] **主包回滚预案**：发布失败 → `git tag -d vX.Y.Z && git reset --hard HEAD~1`
+- [ ] **准备阶段回滚**：tag 未推送时 → `git tag -d vX.Y.Z && git reset --hard HEAD~1`；tag 已推送而 CI 临时失败 → 对同一 tag 重跑工作流（已存在的 npm 版本自动跳过），不要删远端 tag；工作流本身需修复时，修复必须进入新的发版 tag
 
 ---
 
@@ -46,6 +46,7 @@
 > ⚠️ 双入口 re-export `format / jsonToPdText / pdToJsonText`（+ 自研 `highlightPd`），**external + dependencies** `@andares/pdfoundation`，产物零体积、不内联（依赖由消费方 npm 自动安装）。
 
 - [ ] `pnpm --filter @andares/pdeditor build:editor`（lib 五入口 + 单文件 demo）无报错
+- [ ] `pnpm exec tsx --test test/tag-current.test.ts`：根包默认 tag、editor 独立前缀与目标包版本校验、重复打 tag 幂等
 - [ ] `pnpm --filter @andares/pdeditor test`（82 用例：工厂/高亮/元素/React/demo 冒烟 + bundle-guard：各入口仅豁免 `@andares/pdfoundation`（react 入口另豁免 `react`））
 - [ ] **元素层冒烟**（浏览器）：
   - shadow 默认：字体/字号继承宿主；覆盖层 `pre`／行号／placeholder 均 `aria-hidden`；`aria-label` 转发到 textarea

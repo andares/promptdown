@@ -451,13 +451,21 @@ pnpm package         # 以 --no-dependencies 打包 .vsix
 ### 发布
 
 ```bash
-pnpm release-all patch     # 唯一主包发布入口：foundation（同号）→ npm → push/tag → vsce
-pnpm release-editor patch  # editor 独立发布（纯 npm）
-pnpm release-all patch -- --dry-run  # 预览计划（不改动任何东西；旧 release 命令已移除）
+pnpm release-all patch     # 准备 + 推 tag vX.Y.Z（CI 发 foundation 与主包，OIDC）
+pnpm release-editor patch  # editor 独立发布（推 tag pdeditor-vX.Y.Z）
+pnpm release-all patch -- --dry-run          # 预览计划（不改动任何东西）
+pnpm release-all patch -- --prepare-only     # 只到本地 commit + tag，不推
 pnpm tag-current          # 给当前版本打本地 tag vX.Y.Z（已存在则跳过，不推送）
 ```
 
-- `pnpm release-all`（唯一主包入口）：sync（未提交改动自动 commit、本地领先自动 push、本地落后中止、没有则跳过）→ 门禁（含 foundation）→ 主包 + foundation **同号 bump** → `git commit + tag vX.Y.Z` → **先发 foundation 再发主包**（`workspace:^` 发布时自动改写为实际版本）→ push 分支 + tags → 创建 GitHub Release → vsce package + publish。npm 失败中止，vsce 失败降级为只发 npm。
+- **发版 = 推 tag**：`pnpm release-all` 做门禁（含 foundation）、同号 bump、CHANGELOG 归档、commit + tag，
+  最后 push 分支 + `vX.Y.Z`；`.github/workflows/publish.yml` 被 tag 触发后用 OIDC trusted publishing
+  **先发 foundation 再发主包**（无 token、无 2FA、自动 provenance）。本地脚本不再直接写 npm。
+- 本地脚本会等待两包及 provenance 出现在 npm；未确认则退出非零，且不创建 GitHub Release、不发布 VSIX。
+  `--no-wait` 可显式跳过等待，但此时只表示「tag 已推送」，不代表 npm 已确认。
+- `pnpm release-editor` 走独立 tag `pdeditor-vX.Y.Z`，不拖主包版本号；工作区必须干净。
+- GitHub Release 与 vsce 仍在本地完成（`GITHUB_TOKEN` / `VSCE_PAT`，二者无法 OIDC）；npm 临时故障可在
+  Actions 里对同一 tag 重试，已存在的版本会自动跳过。若需修改工作流本身，修复必须进入新的发版 tag。
 - `pnpm release` / `pnpm release-foundation` 已移除（并入 release-all）：误敲会被拦截提示。
 
 ## 📁 项目结构

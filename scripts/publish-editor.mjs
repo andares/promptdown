@@ -2,19 +2,21 @@
 /**
  * One-command release for @andares/pdeditor（Web 输入框组件）。
  *
- *   pnpm release-editor patch            # 纯 npm 发布：0.1.0 → 0.1.1
+ *   pnpm release-editor patch            # 0.1.0 → 0.1.1
+ *   pnpm release-editor patch --prepare-only   # 只到本地 tag，不 push
  *
- * 流程（纯 npm，不做任何 git 操作）：
- * 组件包门禁（typecheck + test + build）→ bump packages/editor/package.json
- * version → CHANGELOG 归档（packages/editor/CHANGELOG.dev.md 开发期条目 →
- * packages/editor/CHANGELOG.md 顶部 "## X.Y.Z (YYYY-MM-DD)"，删 dev 文件；无则提示跳过）
- * → pnpm publish。
+ * 流程（tag = 发版意图，CI = 发版执行）：
+ * 工作区必须干净 → 组件包门禁（typecheck + test + build）→ foundation 目标版本已在 npm
+ * → bump packages/editor/package.json version → CHANGELOG 归档
+ * （packages/editor/CHANGELOG.dev.md 开发期条目 → packages/editor/CHANGELOG.md 顶部
+ * "## X.Y.Z (YYYY-MM-DD)"，删 dev 文件；无则提示跳过）→ commit + tag `pdeditor-vX.Y.Z`
+ * → git push 分支 + tag（触发 CI 发布）→ 轮询 npm 确认版本与 provenance。
  *
- * 不做：sync / commit / tag / push / GitHub Release——editor 是独立版本号的库，
- * 其版本不进入 promptdown 仓库的 git 历史与 tag（仓库 tag 体系是 v{主包版本}）。
- * bump 与 changelog 归档的改动留在工作区，由使用者自行决定何时提交。
+ * 为什么是独立 tag：editor 是独立版本线的库，与主包 `v{X.Y.Z}`（foundation + 主包同号）
+ * 互不拖号。`.github/workflows/publish.yml` 按前缀分流：`v*` → foundation + 主包，
+ * `pdeditor-v*` → editor。
  *
- * `--dry-run` 只打印计划（版本 + 步骤），不修改任何东西。
+ * `--dry-run` 只打印计划（版本 + 步骤），不修改任何东西；`--prepare-only` 停在 push 前。
  *
  * 注意：
  *  - 组件包名就是 @andares/pdeditor（package.json name 即 scoped 名，无改名问题）。
@@ -47,14 +49,18 @@ const C = {
 
 const rawArgs = process.argv.slice(2).filter((a) => a !== "--");
 const dryRun = rawArgs.includes("--dry-run");
-const positional = rawArgs.filter((a) => a !== "--dry-run");
+const prepareOnly = rawArgs.includes("--prepare-only");
+const noWait = rawArgs.includes("--no-wait");
+const META_FLAGS = ["--dry-run", "--prepare-only", "--no-wait"];
+const positional = rawArgs.filter((a) => !META_FLAGS.includes(a));
 const arg = positional[0];
 
 if (!BUMPS.includes(arg)) {
 	console.error(
-		`${C.red}${C.bold}Usage: pnpm release-editor <${BUMPS.join("|")}>${C.reset}` +
-			`\n  Bump ${PKG_NAME} version and publish npm only (no git operations).` +
-			`\n  Add --dry-run to preview without changing anything.`,
+		`${C.red}${C.bold}Usage: pnpm release-editor <${BUMPS.join("|")}> [--dry-run] [--prepare-only] [--no-wait]${C.reset}` +
+			`\n  Bump ${PKG_NAME}, commit + tag pdeditor-vX.Y.Z, push the tag, and let GitHub Actions publish.` +
+			`\n  Add --dry-run to preview without changing anything.` +
+			`\n  Add --prepare-only to stop after commit+tag and print the push command.`,
 	);
 	process.exit(1);
 }
@@ -107,21 +113,119 @@ function run(cmd, args, opts = {}) {
 
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const git = process.platform === "win32" ? "git.exe" : "git";
+const repoMatch = (() => {
+	try {
+		return JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
+			.repository?.url?.match(/github\.com[/:]([^/]+)\/([^/.]+?)(?:\.git)?$/);
+	} catch {
+		return undefined;
+	}
+})();
+const ghRepo = repoMatch ? `${repoMatch[1]}/${repoMatch[2]}` : "andares/promptdown";
+const tag = `pdeditor-v${next}`;
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+/** 轮询 npm 与 provenance；确认成功返回 true，超时/缺 attestation 返回 false。 */
+async function waitForNpm(name, version, { attempts = 30, delayMs = 20000 } = {}) {
+	const url = `https://github.com/${ghRepo}/actions/workflows/publish.yml`;
+	if (noWait) {
+		console.log(`${C.dim}--no-wait：跳过 npm 轮询。工作流：${url}${C.reset}`);
+		return false;
+	}
+	console.log(
+		`${C.dim}  等待 npm 上出现 ${name}@${version}（Ctrl-C 可随时退出，不影响已推的 tag）${C.reset}`,
+	);
+	for (let attempt = 0; attempt < attempts; attempt++) {
+		const probe = spawnSync(npm, ["view", `${name}@${version}`, "version"], {
+			cwd: ROOT,
+			encoding: "utf8",
+		});
+		if (probe.status === 0 && probe.stdout.trim() === version) {
+			let attested = false;
+			for (let attempt = 0; attempt < 6 && !attested; attempt++) {
+				const att = spawnSync(
+					npm,
+					["view", `${name}@${version}`, "dist.attestations", "--json"],
+					{ cwd: ROOT, encoding: "utf8" },
+				);
+				const raw = att.status === 0 ? att.stdout.trim() : "";
+				attested =
+					raw !== "" && raw !== "{}" && raw !== "undefined" && raw !== "null";
+				if (!attested) await sleep(10000);
+			}
+			console.log(
+				attested
+					? `${C.green}✅ ${name}@${version} 已发布，provenance 已附${C.reset}`
+					: `${C.yellow}${name}@${version} 已发布，但 dist.attestations 为空——检查工作流是否走了 OIDC${C.reset}`,
+			);
+			return attested;
+		}
+		process.stdout.write(".");
+		await sleep(delayMs);
+	}
+	console.log(
+		`\n${C.yellow}等待超时：npm 上还没有 ${name}@${version}。本地 tag 不受影响。${C.reset}` +
+			`\n  查看工作流：${url}` +
+			`\n  修复后重跑该工作流（ref 选 ${tag}）；已存在的版本会自动跳过。`,
+	);
+	return false;
+}
 
 if (dryRun) {
 	console.log(`\n${C.dim}--dry-run -- nothing changed. Would run:${C.reset}`);
+	console.log(`  0. 工作区必须干净（有未提交变更则直接中止——CI 只发布 tag 里的内容）`);
 	console.log(`  1. pnpm --filter ${PKG_NAME} typecheck && test && build`);
 	console.log(`  1.5 前置检查：${FOUNDATION_NAME} 目标版本已在 npm（否则 ETARGET）`);
 	console.log(`  2. bump packages/editor/package.json version → ${next}`);
 	console.log(
 		`  3. CHANGELOG.dev.md 存在且有内容 → 归档为 packages/editor/CHANGELOG.md 顶部 "## ${next} (YYYY-MM-DD)"（无则提示跳过）`,
 	);
-	console.log(`  4. pnpm publish（${PKG_NAME}）`);
-	console.log(
-		`  （纯 npm 流程：不 commit、不打 tag、不 push、不建 GitHub Release；bump 与 changelog 归档留在工作区）`,
-	);
+	console.log(`  4. git commit + tag ${tag}`);
+	if (prepareOnly) {
+		console.log(`  5. --prepare-only：停在 push 之前（打印推送命令）`);
+	} else {
+		console.log(
+			`  5. git push origin <branch> refs/tags/${tag} ← 发版动作，触发 GitHub Actions`,
+		);
+		console.log(
+			`  6. CI: install → foundation build → editor typecheck/test/build → 校验 tag==version → pnpm pack → npm publish --provenance`,
+		);
+		console.log(
+			`  7. 轮询 npm 确认 ${PKG_NAME}@${next} 与 provenance（--no-wait 跳过）`,
+		);
+	}
 	process.exit(0);
 }
+
+// 0. 硬闸：CI 从 tag 构建，工作区里的未提交内容不会被发布——必须先提交。
+step("工作区必须干净");
+const branch = run(git, ["branch", "--show-current"], {
+	stdio: "pipe",
+	allowFailure: true,
+})
+	.stdout.toString()
+	.trim();
+if (!branch) {
+	console.error(`${C.red}无法确定当前分支（detached HEAD？）— 中止。${C.reset}`);
+	process.exit(1);
+}
+const dirty = run(git, ["status", "--porcelain"], { stdio: "pipe" })
+	.stdout.toString()
+	.trim();
+if (dirty) {
+	console.error(
+		`${C.red}${C.bold}Aborting: uncommitted changes present.${C.reset}\n` +
+			dirty
+				.split("\n")
+				.map((l) => `  ${l}`)
+				.join("\n") +
+			`\n${C.red}先提交（或 stash）再发版：CI 只发布 tag 指向的内容。${C.reset}`,
+	);
+	process.exit(1);
+}
+console.log(`${C.green}工作区干净${C.reset}`);
 
 // 1. Checks gate（组件包门禁）— 失败即中止，未改动任何东西。
 step("typecheck + test + build（组件包）");
@@ -160,8 +264,10 @@ step(`bump version → ${next}`);
 pkg.version = next;
 writeFileSync(PKG_PATH, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
 
+const changedFiles = [PKG_PATH];
+
 // 2.5 CHANGELOG 归档：开发期条目（packages/editor/CHANGELOG.dev.md）→ CHANGELOG.md 顶部。
-//     版本号发布时才确定，开发期不预写；dev 文件归档后删除，改动留在工作区（无 git 操作）。
+//     版本号发布时才确定，开发期不预写；dev 文件归档后删除，随 release commit 一起进 git。
 step(`CHANGELOG.dev.md → CHANGELOG.md 顶部 "## ${next} (日期)"（归档开发期条目）`);
 if (existsSync(DEV_CHANGELOG_PATH)) {
 	const devRaw = readFileSync(DEV_CHANGELOG_PATH, "utf8");
@@ -210,6 +316,7 @@ if (existsSync(DEV_CHANGELOG_PATH)) {
 			"utf8",
 		);
 		rmSync(DEV_CHANGELOG_PATH);
+		changedFiles.push(CHANGELOG_PATH, DEV_CHANGELOG_PATH);
 		console.log(
 			`${C.green}已归档 ${entries.split("\n").filter((l) => l.trimStart().startsWith("- ")).length} 条到 "## ${next} (${today})"${C.reset}`,
 		);
@@ -220,26 +327,87 @@ if (existsSync(DEV_CHANGELOG_PATH)) {
 	);
 }
 
-// 3. Publish（组件包 prepublishOnly 未设；publish 前已 build）。
-step(`pnpm publish（${PKG_NAME}）`);
-const publish = run(
-	pnpm,
-	["--filter", PKG_NAME, "publish", "--no-git-checks", "--access=public"],
-	{ allowFailure: true },
-);
-if (publish.status !== 0) {
+// 3. Commit + tag（tag 是发版意图，CI 是发版执行）。
+step(`git commit + tag ${tag}`);
+run(git, ["add", ...changedFiles]);
+run(git, ["commit", "-m", `chore: release ${PKG_NAME} v${next}`]);
+run(process.execPath, [
+	join(ROOT, "scripts", "tag-current.mjs"),
+	"--tag",
+	tag,
+	"--package",
+	PKG_PATH,
+]);
+
+// 3b. 自检：tag 必须指向 HEAD 且工作区干净——保证将要发布的内容 == tag 内容。
+const headHash = run(git, ["rev-parse", "HEAD"], { stdio: "pipe" })
+	.stdout.toString()
+	.trim();
+const tagHash = run(git, ["rev-parse", tag], { stdio: "pipe" })
+	.stdout.toString()
+	.trim();
+if (tagHash !== headHash) {
 	console.error(
-		`${C.red}npm publish failed — 版本已锚定在 ${next}。` +
-			`\n  未产生任何 git 操作；工作区可能已有三处改动需手动回退：` +
-			`\n  ① packages/editor/package.json（version bump）` +
-			`\n  ② packages/editor/CHANGELOG.md（若已归档）` +
-			`\n  ③ packages/editor/CHANGELOG.dev.md（已删除——可用 git checkout 恢复）` +
-			`\n  回退后重试。${C.reset}`,
+		`${C.red}Aborting: tag ${tag} (${tagHash.slice(0, 7)}) does not point at HEAD (${headHash.slice(0, 7)}).${C.reset}`,
 	);
-	process.exit(publish.status ?? 1);
+	process.exit(1);
+}
+const dirtyAfterTag = run(git, ["status", "--porcelain"], { stdio: "pipe" })
+	.stdout.toString()
+	.trim();
+if (dirtyAfterTag) {
+	console.error(
+		`${C.red}Aborting: working tree is dirty after commit+tag — the published content would NOT match ${tag}:${C.reset}\n` +
+			dirtyAfterTag
+				.split("\n")
+				.map((l) => `  ${l}`)
+				.join("\n"),
+	);
+	process.exit(1);
+}
+console.log(`${C.green}tag ${tag} == HEAD, working tree clean${C.reset}`);
+
+// 4. 检查点：--prepare-only 停在 push 之前。
+if (prepareOnly) {
+	step("prepare-only：停在 push 之前");
+	console.log(
+		`${C.yellow}未推送——npm 上还不会出现 ${PKG_NAME}@${next}。确认后执行：${C.reset}` +
+			`\n  git push origin ${branch} refs/tags/${tag}` +
+			`\n${C.dim}推 tag 会触发 GitHub Actions 的 publish 工作流（OIDC，无 token）${C.reset}`,
+	);
+	process.exit(0);
+}
+
+// 5. Push 分支 + tag —— 发版动作。
+step(`git push（分支 + tag ${tag}）→ 触发 CI 发布`);
+const push = run(git, ["push", "origin", branch, `refs/tags/${tag}`], {
+	allowFailure: true,
+});
+if (push.status !== 0) {
+	console.error(
+		`${C.red}git push 失败——tag ${tag} 未推送，CI 不会发布。${C.reset}` +
+			`\n  本地 commit + tag 已就绪；修好远端后重试：` +
+			`\n  git push origin ${branch} refs/tags/${tag}` +
+			`\n  决定不发这一版：git tag -d ${tag} && git reset --hard HEAD~1`,
+	);
+	process.exit(push.status ?? 1);
+}
+console.log(`${C.green}✅ 已推送 tag ${tag}，GitHub Actions 开始发布${C.reset}`);
+
+// 6. 等待 CI 把这一版落到 npm；失败必须返回非零，不能声称已发布。
+const publishResult = await waitForNpm(PKG_NAME, next);
+if (!noWait && publishResult !== true) {
+	console.error(
+		`${C.red}${C.bold}CI 未确认 ${PKG_NAME}@${next} 的 npm 发布与 provenance。${C.reset}` +
+			`\n  工作流：https://github.com/${ghRepo}/actions/workflows/publish.yml` +
+			`\n  临时故障可在 Actions 中对同一 tag 重跑；已存在的 npm 版本会自动跳过。`,
+	);
+	process.exit(1);
 }
 
 console.log(
-	`\n${C.green}${C.bold}✅ Published ${PKG_NAME} v${current} → v${next}${C.reset}` +
-		`\n${C.dim}bump 与 changelog 归档未提交（留在工作区），由你自行决定何时 commit。${C.reset}`,
+	noWait
+		? `\n${C.green}${C.bold}✅ ${PKG_NAME} v${next} 的 tag 已推送（未等待 npm 确认）${C.reset}`
+		: `\n${C.green}${C.bold}✅ Released ${PKG_NAME} v${current} → v${next}${C.reset}` +
+				`\n${C.dim}Tag: ${tag} · commit: chore: release ${PKG_NAME} v${next} · npm 发布由 GitHub Actions 完成（OIDC + provenance）${C.reset}`,
 );
